@@ -109,12 +109,16 @@ MEDIA_ROOT = BASE_DIR / "media"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 # ─── REST FRAMEWORK ─────────────────────────────────────────────────────────
+# GLOBAL RULE: Only authenticated staff assigned to a school can use the API.
+# Learners and parents are blocked from all endpoints by default.
+# To grant learners/parents read-only access to specific endpoints,
+# override permission_classes on that view with IsStaffReadOrWriteOwnSchool.
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",
+        "apps.accounts.permissions.IsStaffOfSchool",
     ],
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 50,
