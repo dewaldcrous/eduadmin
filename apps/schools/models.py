@@ -84,6 +84,14 @@ class Classroom(models.Model):
     grade = models.ForeignKey(Grade, on_delete=models.CASCADE, related_name="classrooms")
     name = models.CharField(max_length=20)
     room = models.ForeignKey(Room, on_delete=models.SET_NULL, null=True, blank=True)
+    homeroom_teacher = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="homeroom_classes",
+        help_text="The teacher responsible for this class as homeroom/register teacher.",
+    )
 
     def __str__(self):
         return f"{self.grade.name} {self.name}"
