@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
 
+db_constraint=False
 
 class User(AbstractUser):
     ROLES = [
@@ -14,6 +15,7 @@ class User(AbstractUser):
         ("parent", "Parent/Guardian"),
     ]
 
+
     role = models.CharField(max_length=20, choices=ROLES, default="teacher")
     school = models.ForeignKey(
         "schools.School",
@@ -21,6 +23,7 @@ class User(AbstractUser):
         null=True,
         blank=True,
         related_name="staff",
+        db_constraint=False,
     )
     phone = models.CharField(max_length=20, blank=True)
     profile_photo = models.ImageField(upload_to="profiles/", blank=True)
