@@ -1,0 +1,128 @@
+{% extends "admin/base_site.html" %}
+{% load i18n %}
+
+{% block title %}Bulk Upload Data{% endblock %}
+
+{% block content %}
+<style>
+    .upload-container { max-width: 900px; margin: 0 auto; }
+    .upload-box {
+        background: #f8f9fa; border: 2px dashed #ccc; border-radius: 8px;
+        padding: 30px; text-align: center; margin: 20px 0;
+    }
+    .upload-box:hover { border-color: #417690; }
+    .btn-upload {
+        background: #417690; color: white; padding: 12px 30px;
+        border: none; border-radius: 4px; font-size: 16px; cursor: pointer;
+        margin-top: 15px;
+    }
+    .btn-upload:hover { background: #205067; }
+    .btn-back {
+        background: #666; color: white; padding: 10px 20px;
+        border: none; border-radius: 4px; cursor: pointer;
+        text-decoration: none; display: inline-block; margin-top: 10px;
+    }
+    .result-card {
+        background: white; border: 1px solid #ddd; border-radius: 6px;
+        padding: 15px; margin: 10px 0;
+    }
+    .result-card h3 { margin: 0 0 10px; color: #417690; }
+    .stat { display: inline-block; margin-right: 20px; padding: 5px 12px; border-radius: 4px; font-weight: bold; }
+    .stat-created { background: #d4edda; color: #155724; }
+    .stat-updated { background: #cce5ff; color: #004085; }
+    .stat-errors { background: #f8d7da; color: #721c24; }
+    .error-list { background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 13px; }
+    .error-row { padding: 3px 0; border-bottom: 1px solid #eee; }
+    .summary-box {
+        background: #e8f4f8; border: 1px solid #b8daff; border-radius: 6px;
+        padding: 20px; margin: 20px 0; text-align: center;
+    }
+    .summary-box h2 { margin: 0 0 15px; color: #417690; }
+    .sheet-order {
+        background: #fff; border: 1px solid #ddd; border-radius: 6px;
+        padding: 15px; margin: 15px 0; font-size: 13px;
+    }
+    .sheet-order h4 { margin: 0 0 8px; }
+    .sheet-order ol { margin: 5px 0; padding-left: 25px; }
+    .sheet-order li { padding: 2px 0; }
+    select, input[type="file"] { padding: 8px; margin: 5px; font-size: 14px; }
+</style>
+
+<div class="upload-container">
+
+{% if show_form %}
+    <h1>📤 Bulk Upload Data from Excel</h1>
+    <p>Upload an Excel file with one or more sheets to import data into EduAdmin.
+       Each sheet name maps to a module (staff, grades, learners, etc.).</p>
+
+    <div class="sheet-order">
+        <h4>📋 Sheet import order (fill sheets in this sequence):</h4>
+        <ol>
+            <li><strong>staff</strong> — teachers, HODs, management</li>
+            <li><strong>grades</strong> — Grade 8, Grade 9, etc.</li>
+            <li><strong>subjects</strong> — Mathematics, English, etc.</li>
+            <li><strong>rooms</strong> — Room 101, Science Lab, etc.</li>
+            <li><strong>classrooms</strong> — 8A, 8B, 10A (needs grades)</li>
+            <li><strong>learners</strong> — all learner profiles</li>
+            <li><strong>guardians</strong> — parents (needs learners)</li>
+            <li><strong>enrollments</strong> — links learners → classrooms</li>
+            <li><strong>timetable_slots</strong> — the full timetable</li>
+            <li><strong>curriculum_outcomes</strong> — CAPS outcomes</li>
+            <li><strong>assessments</strong> — tests, exams</li>
+            <li><strong>assessment_marks</strong> — individual marks</li>
+        </ol>
+        <p><em>You don't need all sheets — include only what you need.</em></p>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="upload-box">
+            <p><strong>1. Select the school:</strong></p>
+            <select name="school" required>
+                <option value="">-- Choose School --</option>
+                {% for school in schools %}
+                    <option value="{{ school.id }}">{{ school.name }}</option>
+                {% endfor %}
+            </select>
+
+            <p style="margin-top: 20px;"><strong>2. Choose your Excel file:</strong></p>
+            <input type="file" name="file" accept=".xlsx,.xls" required />
+
+            <br/>
+            <button type="submit" class="btn-upload">Upload & Import</button>
+        </div>
+    </form>
+
+{% else %}
+    <h1>📊 Upload Results</h1>
+
+    <div class="summary-box">
+        <h2>{{ selected_school.name }}</h2>
+        <span class="stat stat-created">✅ {{ total_created }} Created</span>
+        <span class="stat stat-updated">🔄 {{ total_updated }} Updated</span>
+        <span class="stat stat-errors">❌ {{ total_errors }} Errors</span>
+    </div>
+
+    {% for result in results %}
+    <div class="result-card">
+        <h3>📄 {{ result.sheet }}</h3>
+        <span class="stat stat-created">{{ result.created }} created</span>
+        <span class="stat stat-updated">{{ result.updated }} updated</span>
+        {% if result.errors %}
+            <span class="stat stat-errors">{{ result.errors|length }} errors</span>
+            <div class="error-list">
+                {% for err in result.errors %}
+                    <div class="error-row">
+                        <strong>Row {{ err.row }}:</strong> {{ err.error }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    <a href="{% url 'admin:bulk-upload' %}" class="btn-back">← Upload Another File</a>
+{% endif %}
+
+</div>
+{% endblock %}
