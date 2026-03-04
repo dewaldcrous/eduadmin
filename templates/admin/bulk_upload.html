@@ -5,12 +5,15 @@
 
 {% block content %}
 <style>
-    .upload-container { max-width: 900px; margin: 0 auto; }
+    .upload-container { max-width: 900px; margin: 0 auto; color: #222; }
+    .upload-container h1 { color: #222; font-size: 24px; }
+    .upload-container p { color: #333; font-size: 14px; line-height: 1.6; }
     .upload-box {
-        background: #f8f9fa; border: 2px dashed #ccc; border-radius: 8px;
+        background: #f8f9fa; border: 2px dashed #aaa; border-radius: 8px;
         padding: 30px; text-align: center; margin: 20px 0;
     }
     .upload-box:hover { border-color: #417690; }
+    .upload-box p { color: #333; }
     .btn-upload {
         background: #417690; color: white; padding: 12px 30px;
         border: none; border-radius: 4px; font-size: 16px; cursor: pointer;
@@ -18,34 +21,54 @@
     }
     .btn-upload:hover { background: #205067; }
     .btn-back {
-        background: #666; color: white; padding: 10px 20px;
+        background: #417690; color: white; padding: 10px 20px;
         border: none; border-radius: 4px; cursor: pointer;
-        text-decoration: none; display: inline-block; margin-top: 10px;
+        text-decoration: none; display: inline-block; margin-top: 20px;
+        font-size: 14px;
     }
+    .btn-back:hover { background: #205067; color: white; }
     .result-card {
-        background: white; border: 1px solid #ddd; border-radius: 6px;
-        padding: 15px; margin: 10px 0;
+        background: #fff; border: 1px solid #ddd; border-radius: 6px;
+        padding: 20px; margin: 15px 0; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
     }
-    .result-card h3 { margin: 0 0 10px; color: #417690; }
-    .stat { display: inline-block; margin-right: 20px; padding: 5px 12px; border-radius: 4px; font-weight: bold; }
+    .result-card h3 { margin: 0 0 12px; color: #2c3e50; font-size: 18px; }
+    .stat {
+        display: inline-block; margin-right: 15px; padding: 6px 14px;
+        border-radius: 4px; font-weight: bold; font-size: 14px;
+    }
     .stat-created { background: #d4edda; color: #155724; }
     .stat-updated { background: #cce5ff; color: #004085; }
     .stat-errors { background: #f8d7da; color: #721c24; }
-    .error-list { background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 10px; font-size: 13px; }
-    .error-row { padding: 3px 0; border-bottom: 1px solid #eee; }
+    .stat-none { background: #e9ecef; color: #495057; }
+    .error-list {
+        background: #fff8e1; border: 1px solid #ffe082; border-radius: 4px;
+        padding: 12px 15px; margin-top: 12px;
+    }
+    .error-row {
+        padding: 8px 0; border-bottom: 1px solid #f0e6c0;
+        color: #5d4037; font-size: 14px; line-height: 1.5;
+    }
+    .error-row:last-child { border-bottom: none; }
+    .error-row strong { color: #c62828; font-size: 14px; }
     .summary-box {
         background: #e8f4f8; border: 1px solid #b8daff; border-radius: 6px;
-        padding: 20px; margin: 20px 0; text-align: center;
+        padding: 25px; margin: 20px 0; text-align: center;
     }
-    .summary-box h2 { margin: 0 0 15px; color: #417690; }
+    .summary-box h2 { margin: 0 0 15px; color: #2c3e50; font-size: 22px; }
     .sheet-order {
         background: #fff; border: 1px solid #ddd; border-radius: 6px;
-        padding: 15px; margin: 15px 0; font-size: 13px;
+        padding: 20px; margin: 15px 0;
     }
-    .sheet-order h4 { margin: 0 0 8px; }
-    .sheet-order ol { margin: 5px 0; padding-left: 25px; }
-    .sheet-order li { padding: 2px 0; }
-    select, input[type="file"] { padding: 8px; margin: 5px; font-size: 14px; }
+    .sheet-order h4 { margin: 0 0 10px; color: #2c3e50; font-size: 16px; }
+    .sheet-order ol { margin: 8px 0; padding-left: 25px; color: #333; }
+    .sheet-order li { padding: 4px 0; font-size: 14px; line-height: 1.5; }
+    .sheet-order em { color: #666; }
+    select, input[type="file"] {
+        padding: 10px; margin: 5px; font-size: 14px;
+        border: 1px solid #aaa; border-radius: 4px; color: #333;
+    }
+    .success-check { color: #28a745; margin-right: 5px; }
+    .no-errors { color: #28a745; font-size: 14px; margin-top: 8px; }
 </style>
 
 <div class="upload-container">
@@ -106,10 +129,10 @@
     {% for result in results %}
     <div class="result-card">
         <h3>📄 {{ result.sheet }}</h3>
-        <span class="stat stat-created">{{ result.created }} created</span>
-        <span class="stat stat-updated">{{ result.updated }} updated</span>
+        <span class="stat stat-created">✅ {{ result.created }} created</span>
+        <span class="stat stat-updated">🔄 {{ result.updated }} updated</span>
         {% if result.errors %}
-            <span class="stat stat-errors">{{ result.errors|length }} errors</span>
+            <span class="stat stat-errors">⚠ {{ result.errors|length }} errors</span>
             <div class="error-list">
                 {% for err in result.errors %}
                     <div class="error-row">
@@ -117,6 +140,8 @@
                     </div>
                 {% endfor %}
             </div>
+        {% else %}
+            <div class="no-errors">✓ All rows imported successfully</div>
         {% endif %}
     </div>
     {% endfor %}
