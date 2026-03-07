@@ -1,10 +1,11 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate } from "react-router-dom";
 import {
   BookCopy, Plus, Check, Clock, X, Send, Eye,
   ChevronRight, Edit3, AlertCircle, CheckCircle2,
   FileText, ArrowLeft, Save, Loader2,
+  Upload, Download, Paperclip, File,
 } from "lucide-react";
 
 const DAYS = [
@@ -74,9 +75,14 @@ export default function WeeklyPlannerPage() {
   const location = useLocation();
   const incomingState = location.state;
 
+  const fileInputRef = useRef(null);
+  const importInputRef = useRef(null);
   const [selectedPlan, setSelectedPlan] = useState(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createTarget, setCreateTarget] = useState(null);
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [pendingFiles, setPendingFiles] = useState([]);
   const [formData, setFormData] = useState({
     title: "", objectives: "", activities: "", differentiation: "", resources_note: "",
   });
@@ -116,6 +122,35 @@ export default function WeeklyPlannerPage() {
     setShowCreateModal(false);
   };
 
+  const handleFileSelect = (e) => {
+    setPendingFiles(prev => [...prev, ...Array.from(e.target.files)]);
+    e.target.value = "";
+  };
+
+  const removePendingFile = (idx) => setPendingFiles(prev => prev.filter((_, i) => i !== idx));
+
+  const handleImport = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setImportResult({ loading: true });
+    await new Promise(r => setTimeout(r, 1500));
+    setImportResult({ loading: false, created: 3, skipped: 1, errors: ["Row 5: Plan already exists for MON P1 — skipped"], total_rows: 4 });
+    e.target.value = "";
+  };
+
+  const handleExport = (fmt) => {
+    // Production: window.location.href = `/api/v1/planning/export/?format=${fmt}`;
+    alert(`Export as ${fmt.toUpperCase()} — connects to API when backend is running`);
+  };
+
+  const downloadTemplate = () => {
+    const csv = "day,period,title,objectives,activities,differentiation,resources\nMonday,1,Example Title,\"Learners will...\",\"Activity 1, Activity 2\",Support for weaker learners,Textbook Ch.1";
+    const blob = new Blob([csv], { type: "text/csv" });
+    const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = "lesson_plan_template.csv"; a.click();
+  };
+
+  const formatSize = (b) => b < 1024 ? b + " B" : b < 1048576 ? (b/1024).toFixed(1) + " KB" : (b/1048576).toFixed(1) + " MB";
+
   return (
     <div style={styles.page}>
       {/* Header */}
@@ -127,7 +162,10 @@ export default function WeeklyPlannerPage() {
             <p style={styles.subtitle}>Term 1, 2026 · Mathematics</p>
           </div>
         </div>
-        <div style={styles.headerStats}>
+        <div style={styles.headerActions}>
+          <button onClick={() => setShowImportModal(true)} style={styles.importBtn}><Upload size={15} /> Import Excel</button>
+          <button onClick={() => handleExport("xlsx")} style={styles.exportBtn}><Download size={15} /> Export</button>
+        </div>
           <div style={styles.hStat}>
             <span style={styles.hStatValue}>{plansCreated}/{totalSlots}</span>
             <span style={styles.hStatLabel}>Plans created</span>
@@ -369,6 +407,62 @@ export default function WeeklyPlannerPage() {
         </div>
       )}
 
+      {/* ─── IMPORT MODAL ──────────────────────────────────────────── */}
+      {showImportModal && (
+        <div style={styles.overlay} onClick={() => { setShowImportModal(false); setImportResult(null); }}>
+          <div style={{ ...styles.modal, width: 520 }} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <div>
+                <h2 style={styles.modalTitle}>Import Lesson Plans</h2>
+                <p style={{ fontSize: 13, color: "var(--color-slate)", marginTop: 4 }}>Upload CSV or Excel with your plans</p>
+              </div>
+              <button onClick={() => { setShowImportModal(false); setImportResult(null); }} style={styles.closeBtn}><X size={20} /></button>
+            </div>
+            <div style={styles.modalBody}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "var(--space-md)", background: "var(--color-success-light)", borderRadius: "var(--radius-md)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <File size={18} color="var(--color-success)" />
+                  <div><div style={{ fontWeight: 600, fontSize: 14 }}>Download Template</div><div style={{ fontSize: 12, color: "var(--color-slate)" }}>CSV with correct headers</div></div>
+                </div>
+                <button onClick={downloadTemplate} style={{ display: "flex", alignItems: "center", gap: 4, padding: "8px 14px", fontSize: 13, fontWeight: 600, fontFamily: "var(--font-body)", background: "var(--color-surface)", color: "var(--color-success)", border: "1px solid rgba(5,150,105,0.3)", borderRadius: "var(--radius-sm)", cursor: "pointer" }}><Download size={14} /> Download</button>
+              </div>
+              <div style={{ padding: "var(--space-sm) 0" }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-slate-light)", marginBottom: 6 }}>EXPECTED COLUMNS</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  {["day", "period", "title*", "objectives*", "activities", "differentiation", "resources"].map(c => (
+                    <span key={c} style={{ padding: "3px 10px", background: "var(--color-surface-alt)", borderRadius: 99, fontSize: 12, border: "1px solid var(--color-border-light)" }}>{c}</span>
+                  ))}
+                </div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6, padding: "var(--space-lg)", border: "2px dashed var(--color-border)", borderRadius: "var(--radius-md)", cursor: "pointer" }} onClick={() => importInputRef.current?.click()}>
+                <Upload size={24} color="var(--color-slate-light)" />
+                <span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-slate)" }}>Click to select your file</span>
+                <span style={{ fontSize: 12, color: "var(--color-slate-light)" }}>.csv or .xlsx</span>
+                <input ref={importInputRef} type="file" accept=".csv,.xlsx,.xls" onChange={handleImport} style={{ display: "none" }} />
+              </div>
+              {importResult && (
+                <div style={{ padding: "var(--space-md)", background: "var(--color-surface-alt)", borderRadius: "var(--radius-md)", border: "1px solid var(--color-border-light)" }}>
+                  {importResult.loading ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center", padding: "var(--space-md)" }}><Loader2 size={20} style={{ animation: "spin 1s linear infinite" }} /> Importing...</div>
+                  ) : (
+                    <>
+                      <div style={{ display: "flex", gap: "var(--space-lg)", marginBottom: 8 }}>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 14, fontWeight: 600 }}><CheckCircle2 size={16} color="var(--color-success)" /> {importResult.created} created</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 14, fontWeight: 600 }}><AlertCircle size={16} color="var(--color-warning)" /> {importResult.skipped} skipped</div>
+                      </div>
+                      {importResult.errors.map((err, i) => <div key={i} style={{ fontSize: 13, color: "var(--color-warning)", padding: "2px 0" }}>{err}</div>)}
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+            <div style={styles.modalFooter}>
+              <button onClick={() => { setShowImportModal(false); setImportResult(null); }} style={styles.cancelBtn}>{importResult && !importResult.loading ? "Done" : "Cancel"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         @keyframes slideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
@@ -386,7 +480,9 @@ const styles = {
   headerIcon: { width: 48, height: 48, borderRadius: "var(--radius-md)", background: "var(--color-info-light)", display: "flex", alignItems: "center", justifyContent: "center" },
   title: { fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 600, color: "var(--color-navy)", letterSpacing: "-0.02em" },
   subtitle: { fontSize: 14, color: "var(--color-slate)" },
-  headerStats: { display: "flex", gap: "var(--space-lg)" },
+  headerActions: { display: "flex", gap: 8 },
+  importBtn: { display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", fontSize: 13, fontWeight: 600, fontFamily: "var(--font-body)", background: "var(--color-surface)", color: "var(--color-navy)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", cursor: "pointer" },
+  exportBtn: { display: "flex", alignItems: "center", gap: 6, padding: "10px 16px", fontSize: 13, fontWeight: 600, fontFamily: "var(--font-body)", background: "var(--color-navy)", color: "#FEF3C7", border: "none", borderRadius: "var(--radius-sm)", cursor: "pointer" },
   hStat: { textAlign: "center" },
   hStatValue: { fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: "var(--color-navy)", display: "block" },
   hStatLabel: { fontSize: 12, color: "var(--color-slate-light)" },
