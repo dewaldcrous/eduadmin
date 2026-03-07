@@ -5,6 +5,7 @@ import Sidebar from "./components/Sidebar";
 import LoginPage from "./pages/LoginPage";
 import DashboardRouter from "./pages/DashboardRouter";
 import AttendancePage from "./pages/AttendancePage";
+import WeeklyPlannerPage from "./pages/WeeklyPlannerPage";
 import HODDashboardPage from "./pages/HODDashboardPage";
 import ManagementDashboardPage from "./pages/ManagementDashboardPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
@@ -54,7 +55,7 @@ export default function App() {
           <Route element={<ProtectedLayout />}>
             <Route path="/" element={<DashboardRouter />} />
             <Route path="/attendance" element={<AttendancePage />} />
-            <Route path="/planning" element={<PlaceholderPage title="Lesson Planning" />} />
+            <Route path="/planning" element={<WeeklyPlannerPage />} />
             <Route path="/learners" element={<PlaceholderPage title="Learner Profiles" />} />
             <Route path="/behaviour" element={<PlaceholderPage title="Behaviour Tracking" />} />
             <Route path="/assessments" element={<PlaceholderPage title="Assessments & Marks" />} />
