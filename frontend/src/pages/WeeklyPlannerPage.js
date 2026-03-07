@@ -1,351 +1,179 @@
 import React, { useState, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useLocation, useNavigate } from "react-router-dom";
-import {
-  BookCopy, Plus, Check, Clock, X, Send,
-  Edit3, AlertCircle, CheckCircle2, FileText,
-  Save, Loader2, Upload, Download, Paperclip, File,
-  ChevronLeft, ChevronRight, Calendar,
-} from "lucide-react";
+import { BookCopy, Plus, Check, Clock, X, Send, Edit3, AlertCircle, CheckCircle2, FileText, Save, Loader2, Upload, Download, Paperclip, File, ChevronLeft, ChevronRight, Calendar, Palette, Circle, Square, Triangle, Diamond, Star, Hexagon } from "lucide-react";
+var DAYS=[{key:"MON",label:"Monday"},{key:"TUE",label:"Tuesday"},{key:"WED",label:"Wednesday"},{key:"THU",label:"Thursday"},{key:"FRI",label:"Friday"}];
+var PT=[{p:1,s:"07:45",e:"08:30"},{p:2,s:"08:30",e:"09:15"},{p:3,s:"09:15",e:"10:00"},{p:4,s:"10:20",e:"11:05"},{p:5,s:"11:05",e:"11:50"},{p:6,s:"11:50",e:"12:35"},{p:7,s:"13:00",e:"13:45"}];
+var COLORS=[{n:"Blue",v:"#2563EB",l:"#DBEAFE"},{n:"Emerald",v:"#059669",l:"#D1FAE5"},{n:"Amber",v:"#D97706",l:"#FEF3C7"},{n:"Rose",v:"#E11D48",l:"#FFE4E6"},{n:"Purple",v:"#7C3AED",l:"#EDE9FE"},{n:"Teal",v:"#0D9488",l:"#CCFBF1"},{n:"Orange",v:"#EA580C",l:"#FFF7ED"},{n:"Indigo",v:"#4F46E5",l:"#E0E7FF"},{n:"Pink",v:"#DB2777",l:"#FCE7F3"},{n:"Slate",v:"#475569",l:"#F1F5F9"}];
+var SHAPES=[{n:"Circle",i:Circle},{n:"Square",i:Square},{n:"Diamond",i:Diamond},{n:"Star",i:Star},{n:"Hexagon",i:Hexagon},{n:"Triangle",i:Triangle}];
+var DEF_CFG={"10A":{c:COLORS[0],s:SHAPES[0]},"10B":{c:COLORS[1],s:SHAPES[1]},"10C":{c:COLORS[2],s:SHAPES[2]},"11A":{c:COLORS[3],s:SHAPES[3]},"11B":{c:COLORS[4],s:SHAPES[4]},"12A":{c:COLORS[5],s:SHAPES[5]}};
+var INIT={MON:[{p:1,sub:"Mathematics",cl:"10A",plan:{id:1,t:"Number Patterns",st:"approved",obj:"Identify and extend number patterns",act:"Group work, worksheet",dif:"Visual aids",res:"Textbook Ch.2",del:true,att:[{id:1,n:"Worksheet.pdf",tp:"pdf",sz:245e3},{id:2,n:"Slides.pptx",tp:"pptx",sz:12e5}]}},{p:2,sub:"Mathematics",cl:"10B",plan:{id:2,t:"Number Patterns",st:"approved",obj:"Identify patterns",act:"Group work",dif:"",res:"",del:true,att:[]}},{p:3,sub:"Mathematics",cl:"10C",plan:null},{p:4,sub:"Mathematics",cl:"11A",plan:{id:4,t:"Quadratic Equations",st:"pending",obj:"Solve by factoring",act:"Demo, practice",dif:"",res:"",att:[{id:3,n:"Notes.docx",tp:"docx",sz:89e3}]}},{p:5,sub:"Mathematics",cl:"11B",plan:null}],TUE:[{p:1,sub:"Mathematics",cl:"10A",plan:{id:5,t:"Algebraic Expressions",st:"approved",obj:"Simplify expressions",act:"Demo, practice",dif:"",res:"",att:[]}},{p:2,sub:"Mathematics",cl:"10B",plan:{id:6,t:"Algebraic Expressions",st:"draft",obj:"Simplify expressions",act:"Demo, practice",dif:"",res:"",att:[]}},{p:4,sub:"Mathematics",cl:"11A",plan:null},{p:5,sub:"Mathematics",cl:"11B",plan:{id:8,t:"Trig Ratios",st:"rejected",obj:"Calculate trig ratios",act:"Discovery",dif:"",res:"",fb:"Needs differentiation.",att:[]}}],WED:[{p:1,sub:"Mathematics",cl:"10A",plan:{id:9,t:"Exponents",st:"approved",obj:"Apply exponent laws",act:"Examples, exit ticket",dif:"Scaffolded worksheet",res:"Textbook Ch.5",att:[{id:4,n:"Exponents.xlsx",tp:"xlsx",sz:56e3}]}},{p:3,sub:"Mathematics",cl:"10C",plan:null},{p:5,sub:"Mathematics",cl:"11B",plan:null},{p:7,sub:"Mathematics",cl:"12A",plan:{id:11,t:"Calculus Limits",st:"approved",obj:"Understand limits",act:"GeoGebra",dif:"",res:"",att:[]}}],THU:[{p:2,sub:"Mathematics",cl:"10B",plan:null},{p:3,sub:"Mathematics",cl:"10C",plan:null},{p:4,sub:"Mathematics",cl:"11A",plan:{id:13,t:"Quadratic Formula",st:"draft",obj:"Derive formula",act:"Guided derivation",dif:"",res:"",att:[]}},{p:7,sub:"Mathematics",cl:"12A",plan:null}],FRI:[{p:1,sub:"Mathematics",cl:"10A",plan:{id:15,t:"Exponents Practice",st:"approved",obj:"Consolidate laws",act:"Worksheet, peer marking",dif:"3 levels",res:"Printed sheets",att:[]}},{p:2,sub:"Mathematics",cl:"10B",plan:null},{p:3,sub:"Mathematics",cl:"10C",plan:null},{p:5,sub:"Mathematics",cl:"11B",plan:null},{p:7,sub:"Mathematics",cl:"12A",plan:null}]};
+var SC={approved:{lb:"Approved",c:"var(--color-success)",bg:"var(--color-success-light)",ic:CheckCircle2},pending:{lb:"Pending",c:"var(--color-accent)",bg:"var(--color-accent-light)",ic:Clock},draft:{lb:"Draft",c:"var(--color-slate)",bg:"var(--color-surface-alt)",ic:Edit3},rejected:{lb:"Rejected",c:"var(--color-danger)",bg:"var(--color-danger-light)",ic:X}};
+function fSz(b){return b<1024?b+" B":b<1048576?(b/1024).toFixed(1)+" KB":(b/1048576).toFixed(1)+" MB";}
+function gMon(d){var dt=new Date(d);var dy=dt.getDay();dt.setDate(dt.getDate()-dy+(dy===0?-6:1));return dt;}
+function gWN(d){var dt=new Date(d);dt.setHours(0,0,0,0);dt.setDate(dt.getDate()+3-(dt.getDay()+6)%7);var w1=new Date(dt.getFullYear(),0,4);return 1+Math.round(((dt-w1)/864e5-3+(w1.getDay()+6)%7)/7);}
+function fDt(d){return d.toLocaleDateString("en-ZA",{day:"numeric",month:"short"});}
 
-var DAYS = [
-  { key: "MON", label: "Monday" },
-  { key: "TUE", label: "Tuesday" },
-  { key: "WED", label: "Wednesday" },
-  { key: "THU", label: "Thursday" },
-  { key: "FRI", label: "Friday" },
-];
+export default function WeeklyPlannerPage(){
+var auth=useAuth();var user=auth.user;var fRef=useRef(null);var pfRef=useRef(null);var iRef=useRef(null);var today=new Date();var mon0=gMon(today);
+var _a=useState(0);var wOff=_a[0];var sWOff=_a[1];
+var _b=useState(JSON.parse(JSON.stringify(INIT)));var wd=_b[0];var sWd=_b[1];
+var _c=useState(null);var sp=_c[0];var sSp=_c[1];
+var _d=useState(false);var sCr=_d[0];var ssCr=_d[1];
+var _e=useState(false);var isEd=_e[0];var sIsEd=_e[1];
+var _f=useState(null);var tgt=_f[0];var sTgt=_f[1];
+var _g=useState(false);var sImp=_g[0];var ssImp=_g[1];
+var _h=useState(null);var iRes=_h[0];var sIRes=_h[1];
+var _i=useState({t:"",obj:"",act:"",dif:"",res:""});var fm=_i[0];var sFm=_i[1];
+var _j=useState([]);var pnd=_j[0];var sPnd=_j[1];
+var _k=useState(false);var sav=_k[0];var sSav=_k[1];
+var _l=useState(DEF_CFG);var ccfg=_l[0];var sCcfg=_l[1];
+var _m=useState(false);var sCfg=_m[0];var ssCfg=_m[1];
+var _n=useState(null);var cfgCl=_n[0];var sCfgCl=_n[1];
+var _o=useState(100);var nid=_o[0];var sNid=_o[1];
 
-var PERIOD_TIMES = [
-  { period: 1, start: "07:45", end: "08:30" },
-  { period: 2, start: "08:30", end: "09:15" },
-  { period: 3, start: "09:15", end: "10:00" },
-  { period: 4, start: "10:20", end: "11:05" },
-  { period: 5, start: "11:05", end: "11:50" },
-  { period: 6, start: "11:50", end: "12:35" },
-  { period: 7, start: "13:00", end: "13:45" },
-];
+var cMon=new Date(mon0);cMon.setDate(cMon.getDate()+wOff*7);var cFri=new Date(cMon);cFri.setDate(cFri.getDate()+4);var wn=gWN(cMon);var isCur=wOff===0;
+var wDts=[];for(var i=0;i<5;i++){var dd=new Date(cMon);dd.setDate(dd.getDate()+i);wDts.push(dd);}
+var tot=0,made=0,appd=0;Object.values(wd).forEach(function(ss){ss.forEach(function(s){tot++;if(s.plan){made++;if(s.plan.st==="approved")appd++;}});});var miss=tot-made;
 
-var DEMO = {
-  MON: [
-    { period: 1, subject: "Mathematics", class: "10A", plan: { id: 1, title: "Number Patterns", status: "approved", objectives: "Identify and extend number patterns", activities: "Group work, worksheet", delivered: true, attachments: [{ id: 1, name: "Worksheet.pdf", type: "pdf", size: 245000 }, { id: 2, name: "Slides.pptx", type: "pptx", size: 1200000 }] } },
-    { period: 2, subject: "Mathematics", class: "10B", plan: { id: 2, title: "Number Patterns", status: "approved", objectives: "Identify number patterns", activities: "Group work", delivered: true, attachments: [] } },
-    { period: 3, subject: "Mathematics", class: "10C", plan: null },
-    { period: 4, subject: "Mathematics", class: "11A", plan: { id: 4, title: "Quadratic Equations", status: "pending", objectives: "Solve by factoring", activities: "Demo, practice", attachments: [{ id: 3, name: "Notes.docx", type: "docx", size: 89000 }] } },
-    { period: 5, subject: "Mathematics", class: "11B", plan: null },
-  ],
-  TUE: [
-    { period: 1, subject: "Mathematics", class: "10A", plan: { id: 5, title: "Algebraic Expressions", status: "approved", objectives: "Simplify expressions", activities: "Demo, practice", attachments: [] } },
-    { period: 2, subject: "Mathematics", class: "10B", plan: { id: 6, title: "Algebraic Expressions", status: "draft", objectives: "Simplify expressions", activities: "Demo, practice", attachments: [] } },
-    { period: 4, subject: "Mathematics", class: "11A", plan: null },
-    { period: 5, subject: "Mathematics", class: "11B", plan: { id: 8, title: "Trig Ratios", status: "rejected", objectives: "Calculate trig ratios", activities: "Discovery", feedback: "Needs differentiation.", attachments: [] } },
-  ],
-  WED: [
-    { period: 1, subject: "Mathematics", class: "10A", plan: { id: 9, title: "Exponents", status: "approved", objectives: "Apply exponent laws", activities: "Examples, exit ticket", attachments: [{ id: 4, name: "Exponents.xlsx", type: "xlsx", size: 56000 }] } },
-    { period: 3, subject: "Mathematics", class: "10C", plan: null },
-    { period: 5, subject: "Mathematics", class: "11B", plan: null },
-    { period: 7, subject: "Mathematics", class: "12A", plan: { id: 11, title: "Calculus Limits", status: "approved", objectives: "Understand limits", activities: "GeoGebra", attachments: [] } },
-  ],
-  THU: [
-    { period: 2, subject: "Mathematics", class: "10B", plan: null },
-    { period: 3, subject: "Mathematics", class: "10C", plan: null },
-    { period: 4, subject: "Mathematics", class: "11A", plan: { id: 13, title: "Quadratic Formula", status: "draft", objectives: "Derive formula", activities: "Guided derivation", attachments: [] } },
-    { period: 7, subject: "Mathematics", class: "12A", plan: null },
-  ],
-  FRI: [
-    { period: 1, subject: "Mathematics", class: "10A", plan: { id: 15, title: "Exponents Practice", status: "approved", objectives: "Consolidate laws", activities: "Worksheet, peer marking", attachments: [] } },
-    { period: 2, subject: "Mathematics", class: "10B", plan: null },
-    { period: 3, subject: "Mathematics", class: "10C", plan: null },
-    { period: 5, subject: "Mathematics", class: "11B", plan: null },
-    { period: 7, subject: "Mathematics", class: "12A", plan: null },
-  ],
-};
+function gCS(cl){var c=ccfg[cl];return c?{c:c.c.v,l:c.c.l}:{c:"#475569",l:"#F1F5F9"};}
+function gSh(cl){var c=ccfg[cl];return c?c.s.i:Circle;}
 
-var SC = {
-  approved: { label: "Approved", color: "var(--color-success)", bg: "var(--color-success-light)", icon: CheckCircle2 },
-  pending: { label: "Pending", color: "var(--color-accent)", bg: "var(--color-accent-light)", icon: Clock },
-  draft: { label: "Draft", color: "var(--color-slate)", bg: "var(--color-surface-alt)", icon: Edit3 },
-  rejected: { label: "Rejected", color: "var(--color-danger)", bg: "var(--color-danger-light)", icon: X },
-};
+function openC(day,sl){sTgt({p:sl.p,day:day,sub:sl.sub,cl:sl.cl});sFm({t:"",obj:"",act:"",dif:"",res:""});sPnd([]);sIsEd(false);ssCr(true);}
+function openE(plan,slot,dayK){sTgt({p:slot.p,day:dayK,sub:slot.sub,cl:slot.cl});sFm({t:plan.t,obj:plan.obj,act:plan.act,dif:plan.dif||"",res:plan.res||""});sPnd([]);sIsEd(true);ssCr(true);sSp(null);}
 
-function fmtSize(b) {
-  if (b < 1024) return b + " B";
-  if (b < 1048576) return (b / 1024).toFixed(1) + " KB";
-  return (b / 1048576).toFixed(1) + " MB";
+function doSave(submit){return async function(){
+sSav(true);await new Promise(function(r){setTimeout(r,600);});
+var existId=nid;var slots=wd[tgt.day]||[];for(var i=0;i<slots.length;i++){if(slots[i].p===tgt.p&&slots[i].plan)existId=slots[i].plan.id;}
+var np={id:isEd?existId:nid,t:fm.t,obj:fm.obj,act:fm.act,dif:fm.dif,res:fm.res,st:submit?"pending":"draft",att:pnd.map(function(f,idx){return{id:nid+idx+1,n:f.name,tp:f.name.split(".").pop(),sz:f.size,url:URL.createObjectURL(f)};})};
+if(!isEd)sNid(nid+pnd.length+2);
+var upd=JSON.parse(JSON.stringify(wd));var ds=upd[tgt.day];
+if(ds){for(var j=0;j<ds.length;j++){if(ds[j].p===tgt.p){if(ds[j].plan&&isEd){var ea=ds[j].plan.att||[];np.att=ea.concat(np.att);np.del=ds[j].plan.del;np.fb=ds[j].plan.fb;}ds[j].plan=np;break;}}}
+sWd(upd);sSav(false);ssCr(false);
+};}
+
+function onF(e){sPnd(function(p){return p.concat(Array.from(e.target.files));});e.target.value="";}
+function onPF(e){var fs=Array.from(e.target.files).map(function(f,idx){return{id:Date.now()+idx,n:f.name,tp:f.name.split(".").pop(),sz:f.size,url:URL.createObjectURL(f)};});
+if(sp){var at=(sp.att||[]).concat(fs);sSp(Object.assign({},sp,{att:at}));var upd=JSON.parse(JSON.stringify(wd));var ds=upd[sp.day];if(ds){for(var i=0;i<ds.length;i++){if(ds[i].p===sp.slot.p&&ds[i].plan){ds[i].plan.att=at;break;}}}sWd(upd);}e.target.value="";}
+function dlF(a){var el=document.createElement("a");el.href=a.url||"#";el.download=a.n;if(a.url){document.body.appendChild(el);el.click();document.body.removeChild(el);}else{alert("Download: "+a.n);}}
+function rmF(idx){sPnd(function(p){return p.filter(function(_,j){return j!==idx;});});}
+
+async function doImp(e){if(!e.target.files[0])return;sIRes({ld:true});await new Promise(function(r){setTimeout(r,1500);});sIRes({ld:false,cr:3,sk:1,er:["Row 5: Already exists"],tot:4});e.target.value="";}
+function doExp(f){alert("Export "+f.toUpperCase()+"\n/api/v1/planning/export/?format="+f);}
+function dlTpl(){var csv="day,period,title,objectives,activities,differentiation,resources\nMonday,1,Example,Learners will...,Activity 1,Support,Textbook";var el=document.createElement("a");el.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));el.download="lesson_plan_template.csv";document.body.appendChild(el);el.click();document.body.removeChild(el);}
+
+function uCC(cl,c){var cfg=Object.assign({},ccfg);cfg[cl]=Object.assign({},cfg[cl],{c:c});sCcfg(cfg);}
+function uCS(cl,s){var cfg=Object.assign({},ccfg);cfg[cl]=Object.assign({},cfg[cl],{s:s});sCcfg(cfg);}
+
+return(
+<div style={{padding:"var(--space-xl)",maxWidth:1200}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"var(--space-md)"}}>
+<div style={{display:"flex",alignItems:"center",gap:"var(--space-md)"}}><div style={{width:48,height:48,borderRadius:"var(--radius-md)",background:"var(--color-info-light)",display:"flex",alignItems:"center",justifyContent:"center"}}><BookCopy size={22} color="var(--color-info)"/></div><div><h1 style={{fontFamily:"var(--font-display)",fontSize:24,fontWeight:600,color:"var(--color-navy)"}}>Weekly Lesson Planner</h1><p style={{fontSize:14,color:"var(--color-slate)"}}>Term 1, 2026 · Mathematics</p></div></div>
+<div style={{display:"flex",gap:8}}>
+<button onClick={function(){ssCfg(!sCfg);}} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 16px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-accent-light)",color:"var(--color-accent)",border:"1px solid rgba(217,119,6,0.2)",borderRadius:"var(--radius-sm)",cursor:"pointer"}}><Palette size={15}/> Customise</button>
+<button onClick={function(){ssImp(true);}} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 16px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-surface)",color:"var(--color-navy)",border:"1px solid var(--color-border)",borderRadius:"var(--radius-sm)",cursor:"pointer"}}><Upload size={15}/> Import</button>
+<button onClick={function(){doExp("xlsx");}} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 16px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-navy)",color:"#FEF3C7",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer"}}><Download size={15}/> Export</button>
+</div></div>
+
+{sCfg&&<div style={{background:"var(--color-surface)",border:"1px solid var(--color-border-light)",borderRadius:"var(--radius-md)",padding:"var(--space-md)",marginBottom:"var(--space-md)"}}>
+<div style={{display:"flex",alignItems:"center",gap:8,marginBottom:"var(--space-md)"}}><Palette size={16} color="var(--color-accent)"/><span style={{fontFamily:"var(--font-display)",fontSize:15,fontWeight:600,color:"var(--color-navy)",flex:1}}>Class Colours & Shapes</span><button onClick={function(){ssCfg(false);sCfgCl(null);}} style={{background:"none",border:"none",color:"var(--color-slate-light)",cursor:"pointer",padding:4}}><X size={16}/></button></div>
+<div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+{Object.keys(ccfg).map(function(cl){var cfg=ccfg[cl];var SI=cfg.s.i;var isO=cfgCl===cl;
+return <div key={cl}><button onClick={function(){sCfgCl(isO?null:cl);}} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",border:"2px solid "+cfg.c.v,background:cfg.c.l,borderRadius:"var(--radius-sm)",cursor:"pointer",fontFamily:"var(--font-body)",fontSize:13,fontWeight:700,color:cfg.c.v}}><SI size={16} color={cfg.c.v} fill={cfg.c.v}/>{cl}</button>
+{isO&&<div style={{padding:"var(--space-sm)",marginTop:4,background:"var(--color-surface-alt)",borderRadius:"var(--radius-sm)",border:"1px solid var(--color-border-light)"}}>
+<div style={{marginBottom:8}}><div style={{fontSize:11,fontWeight:600,color:"var(--color-slate-light)",marginBottom:4,textTransform:"uppercase"}}>Colour</div><div style={{display:"flex",gap:4,flexWrap:"wrap"}}>{COLORS.map(function(c){return <button key={c.n} onClick={function(){uCC(cl,c);}} title={c.n} style={{width:24,height:24,borderRadius:"50%",background:c.v,border:"none",cursor:"pointer",outline:cfg.c.n===c.n?"3px solid "+c.v:"none",outlineOffset:2}}/>;})}</div></div>
+<div><div style={{fontSize:11,fontWeight:600,color:"var(--color-slate-light)",marginBottom:4,textTransform:"uppercase"}}>Shape</div><div style={{display:"flex",gap:4}}>{SHAPES.map(function(s){var Ic=s.i;return <button key={s.n} onClick={function(){uCS(cl,s);}} title={s.n} style={{width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",border:"1.5px solid "+(cfg.s.n===s.n?cfg.c.v:"var(--color-border)"),borderRadius:"var(--radius-sm)",cursor:"pointer",background:cfg.s.n===s.n?cfg.c.l:"transparent"}}><Ic size={16} color={cfg.c.v}/></button>;})}</div></div>
+</div>}</div>;})}
+</div></div>}
+
+<div style={{display:"flex",alignItems:"center",gap:"var(--space-md)",marginBottom:"var(--space-md)",padding:"var(--space-md)",background:"var(--color-surface)",borderRadius:"var(--radius-md)",border:"1px solid var(--color-border-light)"}}>
+<button onClick={function(){sWOff(wOff-1);}} style={{width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--color-surface-alt)",border:"1px solid var(--color-border-light)",borderRadius:"var(--radius-sm)",cursor:"pointer",color:"var(--color-navy)"}}><ChevronLeft size={18}/></button>
+<div style={{flex:1,textAlign:"center"}}><div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:2}}><Calendar size={15} color="var(--color-accent)"/><span style={{fontFamily:"var(--font-display)",fontSize:18,fontWeight:700,color:"var(--color-navy)"}}>Week {wn}</span>{isCur&&<span style={{fontSize:10,fontWeight:700,color:"#FFF",background:"var(--color-accent)",padding:"2px 8px",borderRadius:99}}>Current</span>}</div><div style={{fontSize:13,color:"var(--color-slate)"}}>{fDt(cMon)} — {fDt(cFri)}, {cMon.getFullYear()}</div></div>
+<button onClick={function(){sWOff(wOff+1);}} style={{width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--color-surface-alt)",border:"1px solid var(--color-border-light)",borderRadius:"var(--radius-sm)",cursor:"pointer",color:"var(--color-navy)"}}><ChevronRight size={18}/></button>
+{!isCur&&<button onClick={function(){sWOff(0);}} style={{padding:"8px 16px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-accent-light)",color:"var(--color-accent)",border:"1px solid rgba(217,119,6,0.2)",borderRadius:"var(--radius-sm)",cursor:"pointer"}}>Today</button>}
+</div>
+
+<div style={{display:"flex",alignItems:"center",gap:"var(--space-lg)",marginBottom:"var(--space-md)",padding:"var(--space-sm) var(--space-md)"}}>
+<div style={{textAlign:"center"}}><span style={{fontFamily:"var(--font-display)",fontSize:20,fontWeight:700,color:"var(--color-navy)",display:"block"}}>{made}/{tot}</span><span style={{fontSize:11,color:"var(--color-slate-light)"}}>Created</span></div>
+<div style={{textAlign:"center"}}><span style={{fontFamily:"var(--font-display)",fontSize:20,fontWeight:700,color:"var(--color-success)",display:"block"}}>{appd}</span><span style={{fontSize:11,color:"var(--color-slate-light)"}}>Approved</span></div>
+<div style={{textAlign:"center"}}><span style={{fontFamily:"var(--font-display)",fontSize:20,fontWeight:700,color:miss>0?"var(--color-danger)":"var(--color-success)",display:"block"}}>{miss}</span><span style={{fontSize:11,color:"var(--color-slate-light)"}}>Missing</span></div>
+<div style={{flex:1}}/><div style={{display:"flex",alignItems:"center",gap:8,flex:1,maxWidth:200}}><div style={{flex:1,height:6,background:"var(--color-surface-alt)",borderRadius:3}}><div style={{height:"100%",background:"var(--color-success)",borderRadius:3,width:Math.round(made/tot*100)+"%"}}/></div><span style={{fontSize:13,fontWeight:600,color:"var(--color-slate)"}}>{Math.round(made/tot*100)}%</span></div>
+</div>
+
+<div style={{overflowX:"auto",marginBottom:"var(--space-md)"}}><div style={{display:"grid",gridTemplateColumns:"80px repeat(5, 1fr)",gap:2,minWidth:880}}>
+<div style={{padding:10,fontSize:11,fontWeight:600,color:"var(--color-slate-light)",textTransform:"uppercase"}}>Period</div>
+{DAYS.map(function(day,idx){var isT=isCur&&wDts[idx].toDateString()===today.toDateString();return <div key={day.key} style={{padding:"10px 8px",background:isT?"var(--color-accent-light)":"var(--color-surface)",borderRadius:"var(--radius-sm) var(--radius-sm) 0 0",textAlign:"center",border:"1px solid "+(isT?"var(--color-accent)":"var(--color-border-light)")}}><div style={{fontSize:13,fontWeight:700,color:"var(--color-navy)"}}>{day.label}</div><div style={{fontSize:11,color:isT?"var(--color-accent)":"var(--color-slate-light)",marginTop:2,fontWeight:isT?700:400}}>{fDt(wDts[idx])}</div></div>;})}
+{PT.map(function(pt){return <React.Fragment key={pt.p}>
+<div style={{padding:"10px 6px",textAlign:"center"}}><div style={{fontWeight:700,fontSize:13,color:"var(--color-navy)"}}>P{pt.p}</div><div style={{fontSize:9,color:"var(--color-slate-light)",marginTop:2}}>{pt.s}–{pt.e}</div></div>
+{DAYS.map(function(day){var sl=(wd[day.key]||[]).find(function(s){return s.p===pt.p;});if(!sl)return <div key={day.key} style={{background:"var(--color-surface-alt)",border:"1px solid var(--color-border-light)",borderRadius:"var(--radius-sm)",padding:8,minHeight:90,display:"flex",alignItems:"center",justifyContent:"center"}}><span style={{color:"var(--color-border)",fontSize:16}}>—</span></div>;
+var pl=sl.plan;var sc=pl?SC[sl.plan.st]:null;var Ic=sc?sc.ic:null;var cs=gCS(sl.cl);var ShI=gSh(sl.cl);
+return <div key={day.key} style={{background:"var(--color-surface)",border:"1px solid var(--color-border-light)",borderRadius:"var(--radius-sm)",padding:8,minHeight:90,cursor:"pointer",borderTop:pl?"3px solid "+sc.c:"3px solid var(--color-border-light)",borderLeft:"4px solid "+cs.c}} onClick={function(){pl?sSp(Object.assign({},pl,{slot:sl,day:day.key})):openC(day.key,sl);}}>
+<div style={{display:"flex",alignItems:"center",gap:4,marginBottom:3}}><ShI size={12} color={cs.c} fill={cs.c}/><span style={{fontSize:10,fontWeight:700,color:cs.c}}>{sl.cl}</span></div>
+{pl?<div><div style={{fontSize:11,fontWeight:600,color:"var(--color-navy)",lineHeight:1.3,marginBottom:4}}>{pl.t}</div><div style={{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"}}><div style={{display:"inline-flex",alignItems:"center",gap:2,padding:"2px 6px",borderRadius:99,fontSize:9,fontWeight:600,background:sc.bg,color:sc.c}}><Ic size={11}/> {sc.lb}</div>{pl.att&&pl.att.length>0&&<div style={{display:"inline-flex",alignItems:"center",gap:2,fontSize:9,color:"var(--color-slate-light)"}}><Paperclip size={10}/> {pl.att.length}</div>}</div>{pl.del&&<div style={{display:"inline-flex",alignItems:"center",gap:2,marginTop:3,fontSize:9,color:"var(--color-success)",fontWeight:600}}><Check size={11}/> Delivered</div>}</div>
+:<button style={{display:"flex",alignItems:"center",gap:3,width:"100%",marginTop:6,padding:6,fontSize:11,fontWeight:500,fontFamily:"var(--font-body)",background:"var(--color-surface-alt)",color:"var(--color-slate)",border:"1px dashed var(--color-border)",borderRadius:"var(--radius-sm)",cursor:"pointer",justifyContent:"center"}} onClick={function(e){e.stopPropagation();openC(day.key,sl);}}><Plus size={14}/> Add Plan</button>}
+</div>;})}
+</React.Fragment>;})}
+</div></div>
+
+<div style={{display:"flex",gap:"var(--space-md)",justifyContent:"center",padding:"var(--space-sm) 0",fontSize:12,color:"var(--color-slate)",flexWrap:"wrap",alignItems:"center"}}>
+{Object.entries(SC).map(function(e){return <div key={e[0]} style={{display:"flex",alignItems:"center",gap:4}}><div style={{width:8,height:8,borderRadius:2,background:e[1].c}}/>{e[1].lb}</div>;})}
+<span style={{color:"var(--color-border)"}}>|</span>
+{Object.keys(ccfg).map(function(cl){var cfg=ccfg[cl];var SI=cfg.s.i;return <div key={cl} style={{display:"flex",alignItems:"center",gap:4}}><SI size={12} color={cfg.c.v} fill={cfg.c.v}/>{cl}</div>;})}
+</div>
+
+{sp&&<div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.4)",zIndex:200,display:"flex",justifyContent:"flex-end",animation:"fadeIn 0.2s"}} onClick={function(){sSp(null);}}><div style={{width:500,height:"100%",background:"var(--color-surface)",overflowY:"auto",padding:"var(--space-xl)",animation:"slideIn 0.25s ease-out",boxShadow:"var(--shadow-lg)"}} onClick={function(e){e.stopPropagation();}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"var(--space-lg)"}}><div><div style={{fontSize:13,color:"var(--color-accent)",fontWeight:600,marginBottom:4}}>{sp.slot.cl} · P{sp.slot.p} · {DAYS.find(function(d){return d.key===sp.day;}).label}</div><h2 style={{fontFamily:"var(--font-display)",fontSize:22,fontWeight:600,color:"var(--color-navy)"}}>{sp.t}</h2></div><button onClick={function(){sSp(null);}} style={{background:"none",border:"none",color:"var(--color-slate-light)",cursor:"pointer",padding:4}}><X size={20}/></button></div>
+<div style={{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:"var(--radius-sm)",fontSize:13,fontWeight:600,marginBottom:"var(--space-lg)",background:SC[sp.st].bg,color:SC[sp.st].c}}>{React.createElement(SC[sp.st].ic,{size:14})} {SC[sp.st].lb}{sp.fb&&<span style={{fontWeight:400,fontStyle:"italic"}}> — "{sp.fb}"</span>}</div>
+<div style={{marginBottom:"var(--space-lg)"}}><div style={{fontSize:12,fontWeight:600,color:"var(--color-slate-light)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Objectives</div><div style={{fontSize:15,color:"var(--color-navy)",lineHeight:1.6}}>{sp.obj}</div></div>
+<div style={{marginBottom:"var(--space-lg)"}}><div style={{fontSize:12,fontWeight:600,color:"var(--color-slate-light)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Activities</div><div style={{fontSize:15,color:"var(--color-navy)",lineHeight:1.6}}>{sp.act}</div></div>
+{sp.dif&&<div style={{marginBottom:"var(--space-lg)"}}><div style={{fontSize:12,fontWeight:600,color:"var(--color-slate-light)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Differentiation</div><div style={{fontSize:15,color:"var(--color-navy)",lineHeight:1.6}}>{sp.dif}</div></div>}
+{sp.res&&<div style={{marginBottom:"var(--space-lg)"}}><div style={{fontSize:12,fontWeight:600,color:"var(--color-slate-light)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Resources</div><div style={{fontSize:15,color:"var(--color-navy)",lineHeight:1.6}}>{sp.res}</div></div>}
+<div style={{marginBottom:"var(--space-lg)"}}>
+<div style={{fontSize:12,fontWeight:600,color:"var(--color-slate-light)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8}}>Attachments ({sp.att?sp.att.length:0})</div>
+{sp.att&&sp.att.length>0?<div style={{display:"flex",flexDirection:"column",gap:6}}>{sp.att.map(function(a){return <div key={a.id} style={{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"var(--color-surface-alt)",borderRadius:"var(--radius-sm)",border:"1px solid var(--color-border-light)"}}><FileText size={16} color="var(--color-info)"/><div style={{flex:1,minWidth:0}}><div style={{fontSize:13,fontWeight:600,color:"var(--color-navy)"}}>{a.n}</div><div style={{fontSize:11,color:"var(--color-slate-light)"}}>{fSz(a.sz)}</div></div><button onClick={function(){dlF(a);}} style={{display:"flex",alignItems:"center",gap:4,padding:"6px 12px",fontSize:12,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-info-light)",color:"var(--color-info)",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer",flexShrink:0}}><Download size={14}/> Download</button></div>;})}</div>:<div style={{fontSize:13,color:"var(--color-slate-light)",fontStyle:"italic",padding:"8px 0"}}>No files attached</div>}
+<input ref={pfRef} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.png,.jpg,.jpeg" onChange={onPF} style={{display:"none"}}/>
+<button onClick={function(){pfRef.current.click();}} style={{display:"flex",alignItems:"center",gap:6,marginTop:10,padding:"10px 16px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-info-light)",color:"var(--color-info)",border:"1px solid rgba(37,99,235,0.15)",borderRadius:"var(--radius-sm)",cursor:"pointer"}}><Upload size={14}/> Upload Files</button>
+</div>
+<div style={{display:"flex",gap:8,paddingTop:"var(--space-lg)",borderTop:"1px solid var(--color-border-light)"}}>
+{(sp.st==="draft"||sp.st==="rejected")&&<button onClick={function(){openE(sp,sp.slot,sp.day);}} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-info-light)",color:"var(--color-info)",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer"}}><Edit3 size={14}/> Edit Plan</button>}
+{sp.st==="draft"&&<button style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-accent)",color:"#FFF",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer"}}><Send size={14}/> Submit</button>}
+{sp.st==="approved"&&!sp.del&&<button style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-success-light)",color:"var(--color-success)",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer"}}><Check size={14}/> Delivered</button>}
+</div>
+</div></div>}
+
+{sCr&&tgt&&<div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.4)",zIndex:200,display:"flex",justifyContent:"center",alignItems:"center",animation:"fadeIn 0.2s"}} onClick={function(){ssCr(false);}}><div style={{width:700,maxHeight:"92vh",background:"var(--color-surface)",borderRadius:"var(--radius-lg)",overflow:"hidden",display:"flex",flexDirection:"column",animation:"fadeIn 0.2s"}} onClick={function(e){e.stopPropagation();}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"var(--space-lg)",borderBottom:"1px solid var(--color-border-light)"}}><div><div style={{fontSize:13,color:"var(--color-accent)",fontWeight:600,marginBottom:4}}>{tgt.sub} · {tgt.cl} · P{tgt.p}</div><h2 style={{fontFamily:"var(--font-display)",fontSize:20,fontWeight:600,color:"var(--color-navy)"}}>{isEd?"Edit Lesson Plan":"New Lesson Plan"}</h2></div><button onClick={function(){ssCr(false);}} style={{background:"none",border:"none",color:"var(--color-slate-light)",cursor:"pointer",padding:4}}><X size={20}/></button></div>
+<div style={{padding:"var(--space-lg)",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:"var(--space-md)"}}>
+<div style={{display:"flex",flexDirection:"column",gap:"var(--space-xs)"}}><label style={{fontSize:13,fontWeight:600,color:"var(--color-slate)"}}>Title *</label><input type="text" value={fm.t} onChange={function(e){sFm(Object.assign({},fm,{t:e.target.value}));}} placeholder="e.g. Algebraic Expressions" style={{width:"100%",padding:"10px 14px",fontSize:14,fontFamily:"var(--font-body)",border:"1.5px solid var(--color-border)",borderRadius:"var(--radius-sm)",background:"var(--color-surface)",color:"var(--color-navy)"}}/></div>
+<div style={{display:"flex",flexDirection:"column",gap:"var(--space-xs)"}}><label style={{fontSize:13,fontWeight:600,color:"var(--color-slate)"}}>Objectives *</label><textarea value={fm.obj} onChange={function(e){sFm(Object.assign({},fm,{obj:e.target.value}));}} placeholder="What will learners do?" style={{width:"100%",padding:"10px 14px",fontSize:14,fontFamily:"var(--font-body)",border:"1.5px solid var(--color-border)",borderRadius:"var(--radius-sm)",background:"var(--color-surface)",color:"var(--color-navy)",resize:"vertical",lineHeight:1.5}} rows={3}/></div>
+<div style={{display:"flex",flexDirection:"column",gap:"var(--space-xs)"}}><label style={{fontSize:13,fontWeight:600,color:"var(--color-slate)"}}>Activities *</label><textarea value={fm.act} onChange={function(e){sFm(Object.assign({},fm,{act:e.target.value}));}} placeholder="Describe activities" style={{width:"100%",padding:"10px 14px",fontSize:14,fontFamily:"var(--font-body)",border:"1.5px solid var(--color-border)",borderRadius:"var(--radius-sm)",background:"var(--color-surface)",color:"var(--color-navy)",resize:"vertical",lineHeight:1.5}} rows={4}/></div>
+<div style={{display:"flex",gap:"var(--space-md)"}}>
+<div style={{display:"flex",flexDirection:"column",gap:"var(--space-xs)",flex:1}}><label style={{fontSize:13,fontWeight:600,color:"var(--color-slate)"}}>Differentiation</label><textarea value={fm.dif} onChange={function(e){sFm(Object.assign({},fm,{dif:e.target.value}));}} placeholder="Support / extension" style={{width:"100%",padding:"10px 14px",fontSize:14,fontFamily:"var(--font-body)",border:"1.5px solid var(--color-border)",borderRadius:"var(--radius-sm)",background:"var(--color-surface)",color:"var(--color-navy)",resize:"vertical",lineHeight:1.5}} rows={2}/></div>
+<div style={{display:"flex",flexDirection:"column",gap:"var(--space-xs)",flex:1}}><label style={{fontSize:13,fontWeight:600,color:"var(--color-slate)"}}>Resources</label><textarea value={fm.res} onChange={function(e){sFm(Object.assign({},fm,{res:e.target.value}));}} placeholder="Textbooks, worksheets" style={{width:"100%",padding:"10px 14px",fontSize:14,fontFamily:"var(--font-body)",border:"1.5px solid var(--color-border)",borderRadius:"var(--radius-sm)",background:"var(--color-surface)",color:"var(--color-navy)",resize:"vertical",lineHeight:1.5}} rows={2}/></div>
+</div>
+<div style={{display:"flex",flexDirection:"column",gap:"var(--space-xs)"}}><label style={{fontSize:13,fontWeight:600,color:"var(--color-slate)"}}>Attachments</label>
+<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"var(--space-lg)",border:"2px dashed var(--color-border)",borderRadius:"var(--radius-md)",cursor:"pointer"}} onClick={function(){fRef.current.click();}}><Upload size={20} color="var(--color-slate-light)"/><span style={{fontSize:14,fontWeight:500,color:"var(--color-slate)"}}>Click to upload files</span><span style={{fontSize:12,color:"var(--color-slate-light)"}}>PDF, Word, PowerPoint, Excel, Images</span><input ref={fRef} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.png,.jpg,.jpeg" onChange={onF} style={{display:"none"}}/></div>
+{pnd.length>0&&<div style={{display:"flex",flexDirection:"column",gap:4,marginTop:8}}>{pnd.map(function(f,i){return <div key={i} style={{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"var(--color-surface-alt)",borderRadius:"var(--radius-sm)",border:"1px solid var(--color-border-light)"}}><File size={14} color="var(--color-info)"/><span style={{flex:1,fontSize:13,fontWeight:500,color:"var(--color-navy)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{f.name}</span><span style={{fontSize:11,color:"var(--color-slate-light)",flexShrink:0}}>{fSz(f.size)}</span><button onClick={function(){rmF(i);}} style={{background:"none",border:"none",color:"var(--color-danger)",cursor:"pointer",padding:4}}><X size={14}/></button></div>;})}</div>}
+</div>
+</div>
+<div style={{display:"flex",justifyContent:"flex-end",gap:8,padding:"var(--space-md) var(--space-lg)",borderTop:"1px solid var(--color-border-light)",background:"var(--color-surface-alt)"}}>
+<button onClick={function(){ssCr(false);}} style={{padding:"10px 18px",fontSize:14,fontWeight:500,fontFamily:"var(--font-body)",background:"transparent",color:"var(--color-slate)",border:"1px solid var(--color-border)",borderRadius:"var(--radius-sm)",cursor:"pointer"}}>Cancel</button>
+<button onClick={doSave(false)} disabled={sav||!fm.t||!fm.obj} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-surface)",color:"var(--color-navy)",border:"1px solid var(--color-border)",borderRadius:"var(--radius-sm)",cursor:"pointer",opacity:sav||!fm.t?0.6:1}}>{sav?<Loader2 size={16} style={{animation:"spin 1s linear infinite"}}/>:<Save size={16}/>} {isEd?"Update Draft":"Save Draft"}</button>
+<button onClick={doSave(true)} disabled={sav||!fm.t||!fm.obj||!fm.act} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-accent)",color:"#FFF",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer",opacity:sav||!fm.act?0.6:1}}><Send size={16}/> {isEd?"Update & Submit":"Save & Submit"}</button>
+</div>
+</div></div>}
+
+{sImp&&<div style={{position:"fixed",inset:0,background:"rgba(15,23,42,0.4)",zIndex:200,display:"flex",justifyContent:"center",alignItems:"center",animation:"fadeIn 0.2s"}} onClick={function(){ssImp(false);sIRes(null);}}><div style={{width:520,maxHeight:"85vh",background:"var(--color-surface)",borderRadius:"var(--radius-lg)",overflow:"hidden",display:"flex",flexDirection:"column",animation:"fadeIn 0.2s"}} onClick={function(e){e.stopPropagation();}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"var(--space-lg)",borderBottom:"1px solid var(--color-border-light)"}}><div><h2 style={{fontFamily:"var(--font-display)",fontSize:20,fontWeight:600,color:"var(--color-navy)"}}>Import Lesson Plans</h2><p style={{fontSize:13,color:"var(--color-slate)",marginTop:4}}>Upload CSV or Excel</p></div><button onClick={function(){ssImp(false);sIRes(null);}} style={{background:"none",border:"none",color:"var(--color-slate-light)",cursor:"pointer",padding:4}}><X size={20}/></button></div>
+<div style={{padding:"var(--space-lg)",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:"var(--space-md)"}}>
+<div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"var(--space-md)",background:"var(--color-success-light)",borderRadius:"var(--radius-md)",border:"1px solid rgba(5,150,105,0.15)"}}><div style={{display:"flex",alignItems:"center",gap:10}}><File size={18} color="var(--color-success)"/><div><div style={{fontWeight:600,fontSize:14}}>Download Template</div><div style={{fontSize:12,color:"var(--color-slate)"}}>CSV with correct headers</div></div></div><button onClick={dlTpl} style={{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-surface)",color:"var(--color-success)",border:"1px solid rgba(5,150,105,0.3)",borderRadius:"var(--radius-sm)",cursor:"pointer"}}><Download size={14}/> Download</button></div>
+<div style={{padding:"var(--space-sm) 0"}}><div style={{fontSize:12,fontWeight:600,color:"var(--color-slate-light)",marginBottom:6,textTransform:"uppercase",letterSpacing:"0.05em"}}>Expected columns</div><div style={{display:"flex",flexWrap:"wrap",gap:4}}>{["day","period","title*","objectives*","activities","differentiation","resources"].map(function(c){return <span key={c} style={{padding:"3px 10px",background:"var(--color-surface-alt)",borderRadius:99,fontSize:12,fontWeight:500,color:"var(--color-slate)",border:"1px solid var(--color-border-light)"}}>{c}</span>;})}</div></div>
+<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"var(--space-lg)",border:"2px dashed var(--color-border)",borderRadius:"var(--radius-md)",cursor:"pointer"}} onClick={function(){iRef.current.click();}}><Upload size={24} color="var(--color-slate-light)"/><span style={{fontSize:14,fontWeight:500,color:"var(--color-slate)"}}>Click to select file</span><span style={{fontSize:12,color:"var(--color-slate-light)"}}>.csv or .xlsx</span><input ref={iRef} type="file" accept=".csv,.xlsx,.xls" onChange={doImp} style={{display:"none"}}/></div>
+{iRes&&<div style={{padding:"var(--space-md)",background:"var(--color-surface-alt)",borderRadius:"var(--radius-md)",border:"1px solid var(--color-border-light)"}}>{iRes.ld?<div style={{display:"flex",alignItems:"center",gap:8,justifyContent:"center",padding:"var(--space-md)",fontSize:14}}><Loader2 size={20} style={{animation:"spin 1s linear infinite"}}/> Importing...</div>:<div><div style={{display:"flex",gap:"var(--space-lg)",marginBottom:8}}><div style={{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600}}><CheckCircle2 size={16} color="var(--color-success)"/> {iRes.cr} created</div><div style={{display:"flex",alignItems:"center",gap:4,fontSize:14,fontWeight:600}}><AlertCircle size={16} color="var(--color-warning)"/> {iRes.sk} skipped</div></div>{iRes.er.map(function(err,i){return <div key={i} style={{fontSize:13,color:"var(--color-warning)",padding:"2px 0"}}>{err}</div>;})}</div>}</div>}
+</div>
+<div style={{display:"flex",justifyContent:"flex-end",gap:8,padding:"var(--space-md) var(--space-lg)",borderTop:"1px solid var(--color-border-light)",background:"var(--color-surface-alt)"}}><button onClick={function(){ssImp(false);sIRes(null);}} style={{padding:"10px 18px",fontSize:14,fontWeight:500,fontFamily:"var(--font-body)",background:"transparent",color:"var(--color-slate)",border:"1px solid var(--color-border)",borderRadius:"var(--radius-sm)",cursor:"pointer"}}>{iRes&&!iRes.ld?"Done":"Cancel"}</button></div>
+</div></div>}
+
+<style dangerouslySetInnerHTML={{__html:"@keyframes spin{to{transform:rotate(360deg)}}@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}input:focus,textarea:focus{outline:none;border-color:var(--color-accent)!important;box-shadow:var(--shadow-glow)!important}"}}/>
+</div>);
 }
-
-function getMonday(d) {
-  var dt = new Date(d);
-  var day = dt.getDay();
-  var diff = dt.getDate() - day + (day === 0 ? -6 : 1);
-  return new Date(dt.setDate(diff));
-}
-
-function getWeekNum(d) {
-  var dt = new Date(d);
-  dt.setHours(0, 0, 0, 0);
-  dt.setDate(dt.getDate() + 3 - (dt.getDay() + 6) % 7);
-  var w1 = new Date(dt.getFullYear(), 0, 4);
-  return 1 + Math.round(((dt.getTime() - w1.getTime()) / 86400000 - 3 + (w1.getDay() + 6) % 7) / 7);
-}
-
-function fmtDate(d) {
-  return d.toLocaleDateString("en-ZA", { day: "numeric", month: "short" });
-}
-
-export default function WeeklyPlannerPage() {
-  var auth = useAuth();
-  var user = auth.user;
-  var fileRef = useRef(null);
-  var panelFileRef = useRef(null);
-  var importRef = useRef(null);
-  var today = new Date();
-  var monday0 = getMonday(today);
-
-  var s1 = useState(0); var weekOff = s1[0]; var setWeekOff = s1[1];
-  var s2 = useState(null); var selPlan = s2[0]; var setSelPlan = s2[1];
-  var s3 = useState(false); var showCreate = s3[0]; var setShowCreate = s3[1];
-  var s4 = useState(null); var target = s4[0]; var setTarget = s4[1];
-  var s5 = useState(false); var showImport = s5[0]; var setShowImport = s5[1];
-  var s6 = useState(null); var impResult = s6[0]; var setImpResult = s6[1];
-  var s7 = useState({ title: "", objectives: "", activities: "", differentiation: "", resources_note: "" }); var form = s7[0]; var setForm = s7[1];
-  var s8 = useState([]); var pending = s8[0]; var setPending = s8[1];
-  var s9 = useState(false); var saving = s9[0]; var setSaving = s9[1];
-
-  var curMon = new Date(monday0); curMon.setDate(curMon.getDate() + weekOff * 7);
-  var curFri = new Date(curMon); curFri.setDate(curFri.getDate() + 4);
-  var wn = getWeekNum(curMon);
-  var isCur = weekOff === 0;
-  var wDates = [];
-  for (var i = 0; i < 5; i++) { var dd = new Date(curMon); dd.setDate(dd.getDate() + i); wDates.push(dd); }
-
-  var tot = Object.values(DEMO).reduce(function(a, b) { return a + b.length; }, 0);
-  var made = Object.values(DEMO).reduce(function(a, b) { return a + b.filter(function(x) { return x.plan; }).length; }, 0);
-  var miss = tot - made;
-  var appd = Object.values(DEMO).reduce(function(a, b) { return a + b.filter(function(x) { return x.plan && x.plan.status === "approved"; }).length; }, 0);
-
-  function openC(day, sl) {
-    setTarget({ period: sl.period, day: day, subject: sl.subject, class: sl.class });
-    setForm({ title: "", objectives: "", activities: "", differentiation: "", resources_note: "" });
-    setPending([]);
-    setShowCreate(true);
-  }
-
-  async function doSave() { setSaving(true); await new Promise(function(r) { setTimeout(r, 800); }); setSaving(false); setShowCreate(false); }
-
-  function onFiles(e) { setPending(function(p) { return p.concat(Array.from(e.target.files)); }); e.target.value = ""; }
-
-  function onPanelFiles(e) {
-    var fs = Array.from(e.target.files).map(function(f, idx) {
-      return { id: Date.now() + idx, name: f.name, type: f.name.split(".").pop(), size: f.size, url: URL.createObjectURL(f) };
-    });
-    if (selPlan) {
-      var atts = (selPlan.attachments || []).concat(fs);
-      setSelPlan(Object.assign({}, selPlan, { attachments: atts }));
-    }
-    e.target.value = "";
-  }
-
-  function dlFile(att) {
-    var a = document.createElement("a");
-    a.href = att.url || "#";
-    a.download = att.name;
-    if (att.url) { document.body.appendChild(a); a.click(); document.body.removeChild(a); }
-    else { alert("Download: " + att.name + "\nConnects to server in production."); }
-  }
-
-  function rmFile(idx) { setPending(function(p) { return p.filter(function(_, j) { return j !== idx; }); }); }
-
-  async function doImport(e) {
-    if (!e.target.files[0]) return;
-    setImpResult({ loading: true });
-    await new Promise(function(r) { setTimeout(r, 1500); });
-    setImpResult({ loading: false, created: 3, skipped: 1, errors: ["Row 5: Already exists"], total_rows: 4 });
-    e.target.value = "";
-  }
-
-  function doExport(f) { alert("Export " + f.toUpperCase() + "\n/api/v1/planning/export/?format=" + f); }
-
-  function dlTemplate() {
-    var csv = "day,period,title,objectives,activities,differentiation,resources\nMonday,1,Example,Learners will...,Activity 1,Support,Textbook";
-    var a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "lesson_plan_template.csv"; document.body.appendChild(a); a.click(); document.body.removeChild(a);
-  }
-
-  var S = styles;
-
-  return (
-    <div style={S.page}>
-      <div style={S.header}>
-        <div style={S.headerLeft}>
-          <div style={S.headerIcon}><BookCopy size={22} color="var(--color-info)" /></div>
-          <div><h1 style={S.title}>Weekly Lesson Planner</h1><p style={S.subtitle}>Term 1, 2026 · Mathematics</p></div>
-        </div>
-        <div style={S.headerActs}>
-          <button onClick={function() { setShowImport(true); }} style={S.impBtn}><Upload size={15} /> Import Excel</button>
-          <button onClick={function() { doExport("xlsx"); }} style={S.expBtn}><Download size={15} /> Export</button>
-        </div>
-      </div>
-
-      <div style={S.weekNav}>
-        <button onClick={function() { setWeekOff(weekOff - 1); }} style={S.wBtn}><ChevronLeft size={18} /></button>
-        <div style={S.weekInfo}>
-          <div style={S.weekLabel}><Calendar size={15} color="var(--color-accent)" /><span style={S.weekTitle}>Week {wn}</span>{isCur && <span style={S.curBadge}>Current</span>}</div>
-          <div style={S.weekDates}>{fmtDate(curMon)} — {fmtDate(curFri)}, {curMon.getFullYear()}</div>
-        </div>
-        <button onClick={function() { setWeekOff(weekOff + 1); }} style={S.wBtn}><ChevronRight size={18} /></button>
-        {!isCur && <button onClick={function() { setWeekOff(0); }} style={S.todayBtn}>Today</button>}
-      </div>
-
-      <div style={S.statsBar}>
-        <div style={S.hStat}><span style={S.hVal}>{made}/{tot}</span><span style={S.hLbl}>Created</span></div>
-        <div style={S.hStat}><span style={Object.assign({}, S.hVal, { color: "var(--color-success)" })}>{appd}</span><span style={S.hLbl}>Approved</span></div>
-        <div style={S.hStat}><span style={Object.assign({}, S.hVal, { color: miss > 0 ? "var(--color-danger)" : "var(--color-success)" })}>{miss}</span><span style={S.hLbl}>Missing</span></div>
-        <div style={{ flex: 1 }} />
-        <div style={S.compWrap}><div style={S.compBar}><div style={Object.assign({}, S.compFill, { width: Math.round(made / tot * 100) + "%" })} /></div><span style={S.compLbl}>{Math.round(made / tot * 100)}%</span></div>
-      </div>
-
-      <div style={S.gridWrap}><div style={S.grid}>
-        <div style={S.corner}>Period</div>
-        {DAYS.map(function(day, idx) {
-          var isT = isCur && wDates[idx].toDateString() === today.toDateString();
-          return <div key={day.key} style={Object.assign({}, S.dayH, isT ? { background: "var(--color-accent-light)", borderColor: "var(--color-accent)" } : {})}><div style={S.dayN}>{day.label}</div><div style={Object.assign({}, S.dayD, isT ? { color: "var(--color-accent)", fontWeight: 700 } : {})}>{fmtDate(wDates[idx])}</div></div>;
-        })}
-        {PERIOD_TIMES.map(function(pt) {
-          return <React.Fragment key={pt.period}>
-            <div style={S.pLabel}><div style={S.pNum}>P{pt.period}</div><div style={S.pTime}>{pt.start}–{pt.end}</div></div>
-            {DAYS.map(function(day) {
-              var sl = (DEMO[day.key] || []).find(function(s) { return s.period === pt.period; });
-              if (!sl) return <div key={day.key} style={S.cellE}><span style={S.cellET}>—</span></div>;
-              var pl = sl.plan; var sc = pl ? SC[pl.status] : null; var Icon = sc ? sc.icon : null;
-              return <div key={day.key} style={Object.assign({}, S.cell, { borderTop: pl ? "3px solid " + sc.color : "3px solid var(--color-border-light)" })} onClick={function() { pl ? setSelPlan(Object.assign({}, pl, { slot: sl, day: day.key })) : openC(day.key, sl); }}>
-                <div style={S.cCls}>{sl.class}</div>
-                {pl ? <div><div style={S.cTitle}>{pl.title}</div><div style={S.cBot}><div style={Object.assign({}, S.cStat, { background: sc.bg, color: sc.color })}><Icon size={11} /> {sc.label}</div>{pl.attachments && pl.attachments.length > 0 && <div style={S.cAtt}><Paperclip size={10} /> {pl.attachments.length}</div>}</div>{pl.delivered && <div style={S.cDel}><Check size={11} /> Delivered</div>}</div>
-                : <button style={S.addBtn} onClick={function(e) { e.stopPropagation(); openC(day.key, sl); }}><Plus size={14} /> Add Plan</button>}
-              </div>;
-            })}
-          </React.Fragment>;
-        })}
-      </div></div>
-
-      <div style={S.legend}>{Object.entries(SC).map(function(e) { return <div key={e[0]} style={S.legItem}><div style={Object.assign({}, S.legDot, { background: e[1].color })} />{e[1].label}</div>; })}<div style={S.legItem}><Paperclip size={12} /> Files</div></div>
-
-      {selPlan && <div style={S.overlay} onClick={function() { setSelPlan(null); }}><div style={S.panel} onClick={function(e) { e.stopPropagation(); }}>
-        <div style={S.panelH}><div><div style={S.panelCls}>{selPlan.slot.class} · P{selPlan.slot.period} · {DAYS.find(function(d) { return d.key === selPlan.day; }).label}</div><h2 style={S.panelT}>{selPlan.title}</h2></div><button onClick={function() { setSelPlan(null); }} style={S.closeBtn}><X size={20} /></button></div>
-        <div style={Object.assign({}, S.badge, { background: SC[selPlan.status].bg, color: SC[selPlan.status].color })}>{React.createElement(SC[selPlan.status].icon, { size: 14 })} {SC[selPlan.status].label}{selPlan.feedback && <span style={{ fontWeight: 400, fontStyle: "italic" }}> — "{selPlan.feedback}"</span>}</div>
-        <div style={S.sec}><div style={S.secL}>Objectives</div><div style={S.secT}>{selPlan.objectives}</div></div>
-        <div style={S.sec}><div style={S.secL}>Activities</div><div style={S.secT}>{selPlan.activities}</div></div>
-        <div style={S.sec}>
-          <div style={S.secL}>Attachments ({selPlan.attachments ? selPlan.attachments.length : 0})</div>
-          {selPlan.attachments && selPlan.attachments.length > 0 ? <div style={S.attList}>{selPlan.attachments.map(function(a) {
-            return <div key={a.id} style={S.attItem}><FileText size={16} color="var(--color-info)" /><div style={{ flex: 1, minWidth: 0 }}><div style={S.attN}>{a.name}</div><div style={S.attS}>{fmtSize(a.size)}</div></div><button onClick={function() { dlFile(a); }} style={S.dlBtn}><Download size={14} /> Download</button></div>;
-          })}</div> : <div style={{ fontSize: 13, color: "var(--color-slate-light)", fontStyle: "italic", padding: "8px 0" }}>No files attached</div>}
-          <input ref={panelFileRef} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.png,.jpg,.jpeg" onChange={onPanelFiles} style={{ display: "none" }} />
-          <button onClick={function() { panelFileRef.current.click(); }} style={S.upBtn}><Upload size={14} /> Upload Files</button>
-        </div>
-        <div style={S.panelActs}>
-          {selPlan.status === "draft" && <button style={S.submitBtn}><Send size={14} /> Submit</button>}
-          {selPlan.status === "rejected" && <button style={S.editBtn}><Edit3 size={14} /> Edit</button>}
-          {selPlan.status === "approved" && !selPlan.delivered && <button style={S.delivBtn}><Check size={14} /> Delivered</button>}
-        </div>
-      </div></div>}
-
-      {showCreate && target && <div style={S.overlay} onClick={function() { setShowCreate(false); }}><div style={S.modal} onClick={function(e) { e.stopPropagation(); }}>
-        <div style={S.modH}><div><div style={S.modMeta}>{target.subject} · {target.class} · P{target.period}</div><h2 style={S.modTitle}>New Lesson Plan</h2></div><button onClick={function() { setShowCreate(false); }} style={S.closeBtn}><X size={20} /></button></div>
-        <div style={S.modBody}>
-          <div style={S.fg}><label style={S.lb}>Title *</label><input type="text" value={form.title} onChange={function(e) { setForm(Object.assign({}, form, { title: e.target.value })); }} placeholder="e.g. Algebraic Expressions" style={S.inp} /></div>
-          <div style={S.fg}><label style={S.lb}>Objectives *</label><textarea value={form.objectives} onChange={function(e) { setForm(Object.assign({}, form, { objectives: e.target.value })); }} placeholder="What will learners do?" style={S.ta} rows={3} /></div>
-          <div style={S.fg}><label style={S.lb}>Activities *</label><textarea value={form.activities} onChange={function(e) { setForm(Object.assign({}, form, { activities: e.target.value })); }} placeholder="Describe activities" style={S.ta} rows={4} /></div>
-          <div style={S.fr}>
-            <div style={Object.assign({}, S.fg, { flex: 1 })}><label style={S.lb}>Differentiation</label><textarea value={form.differentiation} onChange={function(e) { setForm(Object.assign({}, form, { differentiation: e.target.value })); }} placeholder="Support / extension" style={S.ta} rows={2} /></div>
-            <div style={Object.assign({}, S.fg, { flex: 1 })}><label style={S.lb}>Resources</label><textarea value={form.resources_note} onChange={function(e) { setForm(Object.assign({}, form, { resources_note: e.target.value })); }} placeholder="Textbooks, worksheets" style={S.ta} rows={2} /></div>
-          </div>
-          <div style={S.fg}><label style={S.lb}>Attachments</label>
-            <div style={S.drop} onClick={function() { fileRef.current.click(); }}><Upload size={20} color="var(--color-slate-light)" /><span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-slate)" }}>Click to upload files</span><span style={{ fontSize: 12, color: "var(--color-slate-light)" }}>PDF, Word, PowerPoint, Excel, Images</span><input ref={fileRef} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.png,.jpg,.jpeg" onChange={onFiles} style={{ display: "none" }} /></div>
-            {pending.length > 0 && <div style={S.pfList}>{pending.map(function(f, i) { return <div key={i} style={S.pf}><File size={14} color="var(--color-info)" /><span style={S.pfN}>{f.name}</span><span style={S.pfS}>{fmtSize(f.size)}</span><button onClick={function() { rmFile(i); }} style={S.rmBtn}><X size={14} /></button></div>; })}</div>}
-          </div>
-        </div>
-        <div style={S.modFt}>
-          <button onClick={function() { setShowCreate(false); }} style={S.canBtn}>Cancel</button>
-          <button onClick={doSave} disabled={saving || !form.title || !form.objectives} style={Object.assign({}, S.savBtn, { opacity: saving || !form.title ? 0.6 : 1 })}>{saving ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Save size={16} />} Save Draft</button>
-          <button onClick={doSave} disabled={saving || !form.title || !form.objectives || !form.activities} style={Object.assign({}, S.subBtn, { opacity: saving || !form.activities ? 0.6 : 1 })}><Send size={16} /> Save & Submit</button>
-        </div>
-      </div></div>}
-
-      {showImport && <div style={S.overlay} onClick={function() { setShowImport(false); setImpResult(null); }}><div style={Object.assign({}, S.modal, { width: 520 })} onClick={function(e) { e.stopPropagation(); }}>
-        <div style={S.modH}><div><h2 style={S.modTitle}>Import Lesson Plans</h2><p style={{ fontSize: 13, color: "var(--color-slate)", marginTop: 4 }}>Upload CSV or Excel</p></div><button onClick={function() { setShowImport(false); setImpResult(null); }} style={S.closeBtn}><X size={20} /></button></div>
-        <div style={S.modBody}>
-          <div style={S.tplBox}><div style={{ display: "flex", alignItems: "center", gap: 10 }}><File size={18} color="var(--color-success)" /><div><div style={{ fontWeight: 600, fontSize: 14 }}>Download Template</div><div style={{ fontSize: 12, color: "var(--color-slate)" }}>CSV with correct headers</div></div></div><button onClick={dlTemplate} style={S.tplBtn}><Download size={14} /> Download</button></div>
-          <div style={{ padding: "var(--space-sm) 0" }}><div style={{ fontSize: 12, fontWeight: 600, color: "var(--color-slate-light)", marginBottom: 6, textTransform: "uppercase", letterSpacing: "0.05em" }}>Expected columns</div><div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>{["day", "period", "title*", "objectives*", "activities", "differentiation", "resources"].map(function(c) { return <span key={c} style={S.chip}>{c}</span>; })}</div></div>
-          <div style={S.drop} onClick={function() { importRef.current.click(); }}><Upload size={24} color="var(--color-slate-light)" /><span style={{ fontSize: 14, fontWeight: 500, color: "var(--color-slate)" }}>Click to select file</span><span style={{ fontSize: 12, color: "var(--color-slate-light)" }}>.csv or .xlsx</span><input ref={importRef} type="file" accept=".csv,.xlsx,.xls" onChange={doImport} style={{ display: "none" }} /></div>
-          {impResult && <div style={S.impRes}>{impResult.loading ? <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "center", padding: "var(--space-md)", fontSize: 14 }}><Loader2 size={20} style={{ animation: "spin 1s linear infinite" }} /> Importing...</div> : <div><div style={{ display: "flex", gap: "var(--space-lg)", marginBottom: 8 }}><div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 14, fontWeight: 600 }}><CheckCircle2 size={16} color="var(--color-success)" /> {impResult.created} created</div><div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 14, fontWeight: 600 }}><AlertCircle size={16} color="var(--color-warning)" /> {impResult.skipped} skipped</div></div>{impResult.errors.map(function(err, i) { return <div key={i} style={{ fontSize: 13, color: "var(--color-warning)", padding: "2px 0" }}>{err}</div>; })}</div>}</div>}
-        </div>
-        <div style={S.modFt}><button onClick={function() { setShowImport(false); setImpResult(null); }} style={S.canBtn}>{impResult && !impResult.loading ? "Done" : "Cancel"}</button></div>
-      </div></div>}
-
-      <style dangerouslySetInnerHTML={{ __html: "@keyframes spin{to{transform:rotate(360deg)}}@keyframes slideIn{from{transform:translateX(100%)}to{transform:translateX(0)}}@keyframes fadeIn{from{opacity:0}to{opacity:1}}input:focus,textarea:focus{outline:none;border-color:var(--color-accent)!important;box-shadow:var(--shadow-glow)!important}" }} />
-    </div>
-  );
-}
-
-var styles = {
-  page:{padding:"var(--space-xl)",maxWidth:1200},
-  header:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"var(--space-md)"},
-  headerLeft:{display:"flex",alignItems:"center",gap:"var(--space-md)"},
-  headerIcon:{width:48,height:48,borderRadius:"var(--radius-md)",background:"var(--color-info-light)",display:"flex",alignItems:"center",justifyContent:"center"},
-  title:{fontFamily:"var(--font-display)",fontSize:24,fontWeight:600,color:"var(--color-navy)",letterSpacing:"-0.02em"},
-  subtitle:{fontSize:14,color:"var(--color-slate)"},
-  headerActs:{display:"flex",gap:8},
-  impBtn:{display:"flex",alignItems:"center",gap:6,padding:"10px 16px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-surface)",color:"var(--color-navy)",border:"1px solid var(--color-border)",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  expBtn:{display:"flex",alignItems:"center",gap:6,padding:"10px 16px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-navy)",color:"#FEF3C7",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  weekNav:{display:"flex",alignItems:"center",gap:"var(--space-md)",marginBottom:"var(--space-md)",padding:"var(--space-md)",background:"var(--color-surface)",borderRadius:"var(--radius-md)",border:"1px solid var(--color-border-light)"},
-  wBtn:{width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",background:"var(--color-surface-alt)",border:"1px solid var(--color-border-light)",borderRadius:"var(--radius-sm)",cursor:"pointer",color:"var(--color-navy)"},
-  weekInfo:{flex:1,textAlign:"center"},
-  weekLabel:{display:"flex",alignItems:"center",justifyContent:"center",gap:8,marginBottom:2},
-  weekTitle:{fontFamily:"var(--font-display)",fontSize:18,fontWeight:700,color:"var(--color-navy)"},
-  curBadge:{fontSize:10,fontWeight:700,color:"#FFF",background:"var(--color-accent)",padding:"2px 8px",borderRadius:99,letterSpacing:"0.05em"},
-  weekDates:{fontSize:13,color:"var(--color-slate)"},
-  todayBtn:{padding:"8px 16px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-accent-light)",color:"var(--color-accent)",border:"1px solid rgba(217,119,6,0.2)",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  statsBar:{display:"flex",alignItems:"center",gap:"var(--space-lg)",marginBottom:"var(--space-md)",padding:"var(--space-sm) var(--space-md)"},
-  hStat:{textAlign:"center"},hVal:{fontFamily:"var(--font-display)",fontSize:20,fontWeight:700,color:"var(--color-navy)",display:"block"},hLbl:{fontSize:11,color:"var(--color-slate-light)"},
-  compWrap:{display:"flex",alignItems:"center",gap:8,flex:1,maxWidth:200},compBar:{flex:1,height:6,background:"var(--color-surface-alt)",borderRadius:3},compFill:{height:"100%",background:"var(--color-success)",borderRadius:3},compLbl:{fontSize:13,fontWeight:600,color:"var(--color-slate)"},
-  gridWrap:{overflowX:"auto",marginBottom:"var(--space-md)"},grid:{display:"grid",gridTemplateColumns:"80px repeat(5, 1fr)",gap:2,minWidth:880},
-  corner:{padding:10,fontSize:11,fontWeight:600,color:"var(--color-slate-light)",textTransform:"uppercase"},
-  dayH:{padding:"10px 8px",background:"var(--color-surface)",borderRadius:"var(--radius-sm) var(--radius-sm) 0 0",textAlign:"center",border:"1px solid var(--color-border-light)"},
-  dayN:{fontSize:13,fontWeight:700,color:"var(--color-navy)"},dayD:{fontSize:11,color:"var(--color-slate-light)",marginTop:2},
-  pLabel:{padding:"10px 6px",textAlign:"center"},pNum:{fontWeight:700,fontSize:13,color:"var(--color-navy)"},pTime:{fontSize:9,color:"var(--color-slate-light)",marginTop:2},
-  cell:{background:"var(--color-surface)",border:"1px solid var(--color-border-light)",borderRadius:"var(--radius-sm)",padding:8,minHeight:90,cursor:"pointer"},
-  cellE:{background:"var(--color-surface-alt)",border:"1px solid var(--color-border-light)",borderRadius:"var(--radius-sm)",padding:8,minHeight:90,display:"flex",alignItems:"center",justifyContent:"center"},cellET:{color:"var(--color-border)",fontSize:16},
-  cCls:{fontSize:10,fontWeight:700,color:"var(--color-accent)",marginBottom:3},cTitle:{fontSize:11,fontWeight:600,color:"var(--color-navy)",lineHeight:1.3,marginBottom:4},
-  cBot:{display:"flex",alignItems:"center",gap:4,flexWrap:"wrap"},cStat:{display:"inline-flex",alignItems:"center",gap:2,padding:"2px 6px",borderRadius:99,fontSize:9,fontWeight:600},cAtt:{display:"inline-flex",alignItems:"center",gap:2,fontSize:9,color:"var(--color-slate-light)"},cDel:{display:"inline-flex",alignItems:"center",gap:2,marginTop:3,fontSize:9,color:"var(--color-success)",fontWeight:600},
-  addBtn:{display:"flex",alignItems:"center",gap:3,width:"100%",marginTop:6,padding:6,fontSize:11,fontWeight:500,fontFamily:"var(--font-body)",background:"var(--color-surface-alt)",color:"var(--color-slate)",border:"1px dashed var(--color-border)",borderRadius:"var(--radius-sm)",cursor:"pointer",justifyContent:"center"},
-  legend:{display:"flex",gap:"var(--space-md)",justifyContent:"center",padding:"var(--space-sm) 0",fontSize:12,color:"var(--color-slate)"},legItem:{display:"flex",alignItems:"center",gap:5},legDot:{width:8,height:8,borderRadius:2},
-  overlay:{position:"fixed",inset:0,background:"rgba(15,23,42,0.4)",zIndex:200,display:"flex",justifyContent:"flex-end",animation:"fadeIn 0.2s"},
-  panel:{width:500,height:"100%",background:"var(--color-surface)",overflowY:"auto",padding:"var(--space-xl)",animation:"slideIn 0.25s ease-out",boxShadow:"var(--shadow-lg)"},
-  panelH:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:"var(--space-lg)"},panelCls:{fontSize:13,color:"var(--color-accent)",fontWeight:600,marginBottom:4},panelT:{fontFamily:"var(--font-display)",fontSize:22,fontWeight:600,color:"var(--color-navy)"},
-  closeBtn:{background:"none",border:"none",color:"var(--color-slate-light)",cursor:"pointer",padding:4},
-  badge:{display:"inline-flex",alignItems:"center",gap:6,padding:"8px 14px",borderRadius:"var(--radius-sm)",fontSize:13,fontWeight:600,marginBottom:"var(--space-lg)"},
-  sec:{marginBottom:"var(--space-lg)"},secL:{fontSize:12,fontWeight:600,color:"var(--color-slate-light)",textTransform:"uppercase",letterSpacing:"0.05em",marginBottom:8},secT:{fontSize:15,color:"var(--color-navy)",lineHeight:1.6},
-  panelActs:{display:"flex",gap:8,paddingTop:"var(--space-lg)",borderTop:"1px solid var(--color-border-light)"},
-  submitBtn:{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-accent)",color:"#FFF",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  editBtn:{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-info-light)",color:"var(--color-info)",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  delivBtn:{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-success-light)",color:"var(--color-success)",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  attList:{display:"flex",flexDirection:"column",gap:6},attItem:{display:"flex",alignItems:"center",gap:10,padding:"10px 12px",background:"var(--color-surface-alt)",borderRadius:"var(--radius-sm)",border:"1px solid var(--color-border-light)"},attN:{fontSize:13,fontWeight:600,color:"var(--color-navy)"},attS:{fontSize:11,color:"var(--color-slate-light)"},
-  dlBtn:{display:"flex",alignItems:"center",gap:4,padding:"6px 12px",fontSize:12,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-info-light)",color:"var(--color-info)",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer",flexShrink:0},
-  upBtn:{display:"flex",alignItems:"center",gap:6,marginTop:10,padding:"10px 16px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-info-light)",color:"var(--color-info)",border:"1px solid rgba(37,99,235,0.15)",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  modal:{width:700,maxHeight:"92vh",background:"var(--color-surface)",borderRadius:"var(--radius-lg)",overflow:"hidden",display:"flex",flexDirection:"column",margin:"auto",animation:"fadeIn 0.2s"},
-  modH:{display:"flex",justifyContent:"space-between",alignItems:"flex-start",padding:"var(--space-lg)",borderBottom:"1px solid var(--color-border-light)"},modMeta:{fontSize:13,color:"var(--color-accent)",fontWeight:600,marginBottom:4},modTitle:{fontFamily:"var(--font-display)",fontSize:20,fontWeight:600,color:"var(--color-navy)"},
-  modBody:{padding:"var(--space-lg)",overflowY:"auto",flex:1,display:"flex",flexDirection:"column",gap:"var(--space-md)"},
-  fg:{display:"flex",flexDirection:"column",gap:"var(--space-xs)"},fr:{display:"flex",gap:"var(--space-md)"},lb:{fontSize:13,fontWeight:600,color:"var(--color-slate)"},
-  inp:{width:"100%",padding:"10px 14px",fontSize:14,fontFamily:"var(--font-body)",border:"1.5px solid var(--color-border)",borderRadius:"var(--radius-sm)",background:"var(--color-surface)",color:"var(--color-navy)"},
-  ta:{width:"100%",padding:"10px 14px",fontSize:14,fontFamily:"var(--font-body)",border:"1.5px solid var(--color-border)",borderRadius:"var(--radius-sm)",background:"var(--color-surface)",color:"var(--color-navy)",resize:"vertical",lineHeight:1.5},
-  drop:{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:"var(--space-lg)",border:"2px dashed var(--color-border)",borderRadius:"var(--radius-md)",cursor:"pointer"},
-  pfList:{display:"flex",flexDirection:"column",gap:4,marginTop:8},pf:{display:"flex",alignItems:"center",gap:8,padding:"8px 10px",background:"var(--color-surface-alt)",borderRadius:"var(--radius-sm)",border:"1px solid var(--color-border-light)"},pfN:{flex:1,fontSize:13,fontWeight:500,color:"var(--color-navy)",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"},pfS:{fontSize:11,color:"var(--color-slate-light)",flexShrink:0},rmBtn:{background:"none",border:"none",color:"var(--color-danger)",cursor:"pointer",padding:4},
-  modFt:{display:"flex",justifyContent:"flex-end",gap:8,padding:"var(--space-md) var(--space-lg)",borderTop:"1px solid var(--color-border-light)",background:"var(--color-surface-alt)"},
-  canBtn:{padding:"10px 18px",fontSize:14,fontWeight:500,fontFamily:"var(--font-body)",background:"transparent",color:"var(--color-slate)",border:"1px solid var(--color-border)",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  savBtn:{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-surface)",color:"var(--color-navy)",border:"1px solid var(--color-border)",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  subBtn:{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-accent)",color:"#FFF",border:"none",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  tplBox:{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"var(--space-md)",background:"var(--color-success-light)",borderRadius:"var(--radius-md)",border:"1px solid rgba(5,150,105,0.15)"},
-  tplBtn:{display:"flex",alignItems:"center",gap:6,padding:"8px 14px",fontSize:13,fontWeight:600,fontFamily:"var(--font-body)",background:"var(--color-surface)",color:"var(--color-success)",border:"1px solid rgba(5,150,105,0.3)",borderRadius:"var(--radius-sm)",cursor:"pointer"},
-  chip:{padding:"3px 10px",background:"var(--color-surface-alt)",borderRadius:99,fontSize:12,fontWeight:500,color:"var(--color-slate)",border:"1px solid var(--color-border-light)"},
-  impRes:{padding:"var(--space-md)",background:"var(--color-surface-alt)",borderRadius:"var(--radius-md)",border:"1px solid var(--color-border-light)"},
-};
