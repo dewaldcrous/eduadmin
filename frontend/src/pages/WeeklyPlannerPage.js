@@ -284,11 +284,11 @@ return <div key={cl}><button onClick={function(){sCfgCl(isO?null:cl);}} style={{
 </div></div>}
 
 {/* Upload drop zone */}
-<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:24,border:"2px dashed var(--color-border)",borderRadius:10,cursor:"pointer"}} onClick={function(){editFRef.current.click();}}>
+<input ref={editFRef} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.png,.jpg,.jpeg" onChange={onCreateFiles} style={{display:"none"}}/>
+<div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:6,padding:24,border:"2px dashed var(--color-border)",borderRadius:10,cursor:"pointer"}} onClick={function(e){e.preventDefault();editFRef.current.click();}}>
 <Upload size={20} color="var(--color-slate-light)"/>
 <span style={{fontSize:14,fontWeight:500,color:"var(--color-slate)"}}>Click to upload files</span>
 <span style={{fontSize:12,color:"var(--color-slate-light)"}}>PDF, Word, PowerPoint, Excel, Images</span>
-<input ref={editFRef} type="file" multiple accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.csv,.png,.jpg,.jpeg" onChange={onCreateFiles} style={{display:"none"}}/>
 </div>
 
 {/* Pending new files */}

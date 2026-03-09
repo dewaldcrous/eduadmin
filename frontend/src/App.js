@@ -6,29 +6,21 @@ import LoginPage from "./pages/LoginPage";
 import DashboardRouter from "./pages/DashboardRouter";
 import AttendancePage from "./pages/AttendancePage";
 import WeeklyPlannerPage from "./pages/WeeklyPlannerPage";
+import LearnersPage from "./pages/LearnersPage";
 import HODDashboardPage from "./pages/HODDashboardPage";
 import ManagementDashboardPage from "./pages/ManagementDashboardPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 
 function ProtectedLayout() {
   const { user, loading } = useAuth();
-
   if (loading) {
     return (
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "center",
-        height: "100vh", fontFamily: "var(--font-display)", fontSize: 18,
-        color: "var(--color-slate-light)",
-      }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", fontFamily: "var(--font-display)", fontSize: 18, color: "var(--color-slate-light)" }}>
         Loading...
       </div>
     );
   }
-
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
+  if (!user) return <Navigate to="/login" replace />;
   return (
     <div style={{ display: "flex" }}>
       <Sidebar />
@@ -56,7 +48,7 @@ export default function App() {
             <Route path="/" element={<DashboardRouter />} />
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/planning" element={<WeeklyPlannerPage />} />
-            <Route path="/learners" element={<PlaceholderPage title="Learner Profiles" />} />
+            <Route path="/learners" element={<LearnersPage />} />
             <Route path="/behaviour" element={<PlaceholderPage title="Behaviour Tracking" />} />
             <Route path="/assessments" element={<PlaceholderPage title="Assessments & Marks" />} />
             <Route path="/calendar" element={<PlaceholderPage title="School Calendar" />} />
