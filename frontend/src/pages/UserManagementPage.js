@@ -1,0 +1,503 @@
+import React, { useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import {
+  Users, Plus, X, Search, Edit3, UserX, UserCheck,
+  Eye, EyeOff, AlertCircle, Check, ChevronDown, Shield,
+  Phone, Mail, GraduationCap, BookOpen,
+} from "lucide-react";
+
+// ─── STATIC DATA ─────────────────────────────────────────────────────────────
+
+const ROLES = [
+  { id: "teacher",    label: "Teacher",           color: "#7C3AED", bg: "#EDE9FE" },
+  { id: "hod",        label: "Head of Department", color: "#0891B2", bg: "#E0F2FE" },
+  { id: "grade_head", label: "Grade Head",         color: "#0284C7", bg: "#DBEAFE" },
+  { id: "deputy",     label: "Deputy Principal",   color: "#D97706", bg: "#FEF3C7" },
+  { id: "principal",  label: "Principal",          color: "#DC2626", bg: "#FEE2E2" },
+  { id: "admin",      label: "Administrator",      color: "#475569", bg: "#F1F5F9" },
+  { id: "learner",    label: "Learner",            color: "#059669", bg: "#D1FAE5" },
+  { id: "parent",     label: "Parent/Guardian",    color: "#64748B", bg: "#F8FAFC" },
+];
+
+const SUBJECTS = ["Mathematics","English","Physical Sciences","Life Sciences","Geography","History","Accounting","Life Orientation","Computer Applications","EMS"];
+const GRADES   = ["Grade 10","Grade 11","Grade 12"];
+
+let nextUserId = 30;
+
+const INIT_USERS = [
+  { id:1,  username:"principal.mokoena",  firstName:"Thandi",    lastName:"Mokoena",      email:"t.mokoena@school.edu.za",  role:"principal",  phone:"082-111-0001", active:true,  subjects:[],            grade:"" },
+  { id:2,  username:"deputy.vanwyk",      firstName:"Johan",     lastName:"Van Wyk",      email:"j.vanwyk@school.edu.za",   role:"deputy",     phone:"082-111-0002", active:true,  subjects:[],            grade:"" },
+  { id:3,  username:"hod.naidoo",         firstName:"Priya",     lastName:"Naidoo",       email:"p.naidoo@school.edu.za",   role:"hod",        phone:"082-111-0003", active:true,  subjects:["Mathematics"],grade:"" },
+  { id:4,  username:"t.williams",         firstName:"Sarah",     lastName:"Williams",     email:"s.williams@school.edu.za", role:"teacher",    phone:"082-111-0004", active:true,  subjects:["Mathematics"],grade:"" },
+  { id:5,  username:"t.jordaan",          firstName:"Theresa",   lastName:"Jordaan",      email:"t.jordaan@school.edu.za",  role:"teacher",    phone:"082-111-0005", active:true,  subjects:["English"],    grade:"" },
+  { id:6,  username:"t.erasmus",          firstName:"Rudi",      lastName:"Erasmus",      email:"r.erasmus@school.edu.za",  role:"teacher",    phone:"082-111-0006", active:true,  subjects:["Physical Sciences"],grade:"" },
+  { id:7,  username:"t.mabaso",           firstName:"Linda",     lastName:"Mabaso",       email:"l.mabaso@school.edu.za",   role:"teacher",    phone:"082-111-0007", active:true,  subjects:["Life Sciences"],grade:"" },
+  { id:8,  username:"admin.pillay",       firstName:"Raj",       lastName:"Pillay",       email:"r.pillay@school.edu.za",   role:"admin",      phone:"082-111-0008", active:true,  subjects:[],            grade:"" },
+  { id:9,  username:"l.lerato.mokoena",   firstName:"Lerato",    lastName:"Mokoena",      email:"",                         role:"learner",    phone:"",             active:true,  subjects:[],            grade:"Grade 10" },
+  { id:10, username:"l.sipho.dlamini",    firstName:"Sipho",     lastName:"Dlamini",      email:"",                         role:"learner",    phone:"",             active:false, subjects:[],            grade:"Grade 10" },
+];
+
+function roleInfo(roleId) { return ROLES.find((r) => r.id === roleId) || { label: roleId, color: "#64748B", bg: "#F1F5F9" }; }
+
+function generateUsername(firstName, lastName, role) {
+  const first = firstName.trim().toLowerCase().replace(/\s+/g, "");
+  const last = lastName.trim().toLowerCase().replace(/\s+/g, "");
+  if (role === "learner") return `l.${first}.${last}`;
+  if (["principal","deputy","admin","hod"].includes(role)) return `${role}.${last}`;
+  return `t.${last}`;
+}
+
+const EMPTY_FORM = {
+  username: "", firstName: "", lastName: "", email: "",
+  phone: "", role: "teacher", subjects: [], grade: "",
+  password: "", confirmPassword: "",
+};
+
+// ─── USER FORM MODAL ──────────────────────────────────────────────────────────
+
+function UserFormModal({ user, onClose, onSave }) {
+  const isEdit = !!user;
+  const [form, setForm] = useState(isEdit ? {
+    username: user.username, firstName: user.firstName, lastName: user.lastName,
+    email: user.email, phone: user.phone, role: user.role,
+    subjects: user.subjects || [], grade: user.grade || "",
+    password: "", confirmPassword: "",
+  } : { ...EMPTY_FORM });
+  const [showPw, setShowPw] = useState(false);
+  const [errors, setErrors] = useState({});
+  const [saving, setSaving] = useState(false);
+
+  function autoUsername() {
+    if (!isEdit && form.firstName && form.lastName) {
+      setForm((f) => ({ ...f, username: generateUsername(f.firstName, f.lastName, f.role) }));
+    }
+  }
+
+  function validate() {
+    const errs = {};
+    if (!form.firstName.trim()) errs.firstName = "Required";
+    if (!form.lastName.trim()) errs.lastName = "Required";
+    if (!form.username.trim()) errs.username = "Required";
+    if (form.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) errs.email = "Invalid email";
+    if (!isEdit) {
+      if (!form.password) errs.password = "Required for new user";
+      else if (form.password.length < 8) errs.password = "Min 8 characters";
+      if (form.password !== form.confirmPassword) errs.confirmPassword = "Passwords don't match";
+    } else if (form.password && form.password !== form.confirmPassword) {
+      errs.confirmPassword = "Passwords don't match";
+    }
+    return errs;
+  }
+
+  async function handleSave() {
+    const errs = validate();
+    if (Object.keys(errs).length) { setErrors(errs); return; }
+    setSaving(true);
+    await new Promise((r) => setTimeout(r, 600));
+    onSave({
+      id: isEdit ? user.id : ++nextUserId,
+      username: form.username.trim(),
+      firstName: form.firstName.trim(),
+      lastName: form.lastName.trim(),
+      email: form.email.trim(),
+      phone: form.phone.trim(),
+      role: form.role,
+      subjects: form.subjects,
+      grade: form.grade,
+      active: isEdit ? user.active : true,
+    });
+    setSaving(false);
+    onClose();
+  }
+
+  function toggleSubject(s) {
+    setForm((f) => ({
+      ...f,
+      subjects: f.subjects.includes(s) ? f.subjects.filter((x) => x !== s) : [...f.subjects, s],
+    }));
+  }
+
+  const ri = roleInfo(form.role);
+  const isStaff = !["learner","parent"].includes(form.role);
+
+  return (
+    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.45)", zIndex: 300, display: "flex", alignItems: "center", justifyContent: "center", padding: 24, animation: "fadeIn 0.15s" }}
+      onClick={onClose}>
+      <div style={{ width: 620, maxHeight: "90vh", background: "#FFF", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 24px 64px rgba(0,0,0,0.15)" }}
+        onClick={(e) => e.stopPropagation()}>
+
+        {/* Header */}
+        <div style={{ padding: "20px 24px", borderBottom: "1px solid #E2E8F0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <h3 style={{ fontFamily: "var(--font-display)", fontSize: 18, fontWeight: 600, color: "var(--color-navy)" }}>
+              {isEdit ? `Edit User — ${user.firstName} ${user.lastName}` : "Add New User"}
+            </h3>
+            <p style={{ fontSize: 13, color: "#64748B", marginTop: 2 }}>
+              {isEdit ? "Update account details" : "Create a new account and assign role"}
+            </p>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={20} /></button>
+        </div>
+
+        {/* Form */}
+        <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
+
+          {/* Role */}
+          <div>
+            <label style={lbl}>Role *</label>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              {ROLES.map((r) => (
+                <button key={r.id} onClick={() => setForm({ ...form, role: r.id, subjects: [], grade: "" })}
+                  style={{ padding: "6px 14px", borderRadius: 99, border: "2px solid " + (form.role === r.id ? r.color : "#E2E8F0"), background: form.role === r.id ? r.bg : "#FFF", color: form.role === r.id ? r.color : "#64748B", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: form.role === r.id ? 700 : 400, cursor: "pointer", transition: "all 0.12s" }}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Name row */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={lbl}>First Name *</label>
+              <input style={{ ...inp, borderColor: errors.firstName ? "#DC2626" : "#E2E8F0" }} value={form.firstName}
+                onChange={(e) => { setForm({ ...form, firstName: e.target.value }); setErrors({ ...errors, firstName: "" }); }}
+                onBlur={autoUsername} placeholder="e.g. Sarah" />
+              {errors.firstName && <p style={err}>{errors.firstName}</p>}
+            </div>
+            <div>
+              <label style={lbl}>Last Name *</label>
+              <input style={{ ...inp, borderColor: errors.lastName ? "#DC2626" : "#E2E8F0" }} value={form.lastName}
+                onChange={(e) => { setForm({ ...form, lastName: e.target.value }); setErrors({ ...errors, lastName: "" }); }}
+                onBlur={autoUsername} placeholder="e.g. Williams" />
+              {errors.lastName && <p style={err}>{errors.lastName}</p>}
+            </div>
+          </div>
+
+          {/* Username */}
+          <div>
+            <label style={lbl}>Username *</label>
+            <input style={{ ...inp, borderColor: errors.username ? "#DC2626" : "#E2E8F0" }} value={form.username}
+              onChange={(e) => { setForm({ ...form, username: e.target.value }); setErrors({ ...errors, username: "" }); }}
+              placeholder="e.g. t.williams" />
+            {errors.username && <p style={err}>{errors.username}</p>}
+            {!isEdit && form.firstName && form.lastName && (
+              <p style={{ fontSize: 11, color: "#94A3B8", marginTop: 3 }}>Auto-generated — click to customise</p>
+            )}
+          </div>
+
+          {/* Email + Phone */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={lbl}>Email</label>
+              <input type="email" style={{ ...inp, borderColor: errors.email ? "#DC2626" : "#E2E8F0" }} value={form.email}
+                onChange={(e) => { setForm({ ...form, email: e.target.value }); setErrors({ ...errors, email: "" }); }}
+                placeholder="email@school.edu.za" />
+              {errors.email && <p style={err}>{errors.email}</p>}
+            </div>
+            <div>
+              <label style={lbl}>Phone</label>
+              <input style={inp} value={form.phone}
+                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                placeholder="082-000-0000" />
+            </div>
+          </div>
+
+          {/* Subjects (staff only) */}
+          {isStaff && (
+            <div>
+              <label style={lbl}>Subjects</label>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {SUBJECTS.map((s) => {
+                  const sel = form.subjects.includes(s);
+                  return (
+                    <button key={s} onClick={() => toggleSubject(s)}
+                      style={{ padding: "5px 12px", borderRadius: 99, border: "1.5px solid " + (sel ? "#7C3AED" : "#E2E8F0"), background: sel ? "#EDE9FE" : "#FFF", color: sel ? "#7C3AED" : "#64748B", fontFamily: "var(--font-body)", fontSize: 12, fontWeight: sel ? 700 : 400, cursor: "pointer" }}>
+                      {sel && <Check size={10} style={{ display: "inline", marginRight: 3 }} />}{s}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Grade (learner) */}
+          {form.role === "learner" && (
+            <div>
+              <label style={lbl}>Grade *</label>
+              <select style={{ ...inp, cursor: "pointer" }} value={form.grade}
+                onChange={(e) => setForm({ ...form, grade: e.target.value })}>
+                <option value="">— Select Grade —</option>
+                {GRADES.map((g) => <option key={g} value={g}>{g}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Password */}
+          <div style={{ paddingTop: 8, borderTop: "1px solid #F1F5F9" }}>
+            <label style={lbl}>{isEdit ? "New Password (leave blank to keep current)" : "Password *"}</label>
+            <div style={{ position: "relative" }}>
+              <input type={showPw ? "text" : "password"} style={{ ...inp, paddingRight: 40, borderColor: errors.password ? "#DC2626" : "#E2E8F0" }}
+                value={form.password} onChange={(e) => { setForm({ ...form, password: e.target.value }); setErrors({ ...errors, password: "" }); }}
+                placeholder={isEdit ? "Leave blank to keep current" : "Min 8 characters"} />
+              <button type="button" onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 12, top: 11, background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
+            </div>
+            {errors.password && <p style={err}>{errors.password}</p>}
+          </div>
+
+          {(form.password || !isEdit) && (
+            <div>
+              <label style={lbl}>Confirm Password {!isEdit && "*"}</label>
+              <input type={showPw ? "text" : "password"} style={{ ...inp, borderColor: errors.confirmPassword ? "#DC2626" : "#E2E8F0" }}
+                value={form.confirmPassword} onChange={(e) => { setForm({ ...form, confirmPassword: e.target.value }); setErrors({ ...errors, confirmPassword: "" }); }}
+                placeholder="Repeat password" />
+              {errors.confirmPassword && <p style={err}>{errors.confirmPassword}</p>}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "16px 24px", borderTop: "1px solid #E2E8F0", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose} style={{ padding: "10px 20px", border: "1px solid #E2E8F0", borderRadius: 8, background: "#FFF", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, color: "#64748B", cursor: "pointer" }}>Cancel</button>
+          <button onClick={handleSave} disabled={saving}
+            style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 24px", border: "none", borderRadius: 8, background: ri.color, color: "#FFF", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: 600, cursor: saving ? "not-allowed" : "pointer", opacity: saving ? 0.7 : 1 }}>
+            {saving ? "Saving…" : (isEdit ? <><Check size={14} /> Save Changes</> : <><Plus size={14} /> Create User</>)}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── MAIN PAGE ────────────────────────────────────────────────────────────────
+
+export default function UserManagementPage() {
+  const { user } = useAuth();
+
+  const [users, setUsers] = useState(INIT_USERS);
+  const [search, setSearch] = useState("");
+  const [roleFilter, setRoleFilter] = useState("all");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [showModal, setShowModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [showRoleDrop, setShowRoleDrop] = useState(false);
+
+  // ── Filters ──
+  const filtered = users.filter((u) => {
+    if (roleFilter !== "all" && u.role !== roleFilter) return false;
+    if (statusFilter === "active" && !u.active) return false;
+    if (statusFilter === "inactive" && u.active) return false;
+    if (search) {
+      const q = search.toLowerCase();
+      if (!`${u.firstName} ${u.lastName} ${u.username} ${u.email}`.toLowerCase().includes(q)) return false;
+    }
+    return true;
+  });
+
+  // ── Save user ──
+  function handleSave(userData) {
+    setUsers((prev) => {
+      const exists = prev.find((u) => u.id === userData.id);
+      return exists ? prev.map((u) => u.id === userData.id ? userData : u) : [...prev, userData];
+    });
+  }
+
+  // ── Toggle active ──
+  function toggleActive(userId) {
+    setUsers((prev) => prev.map((u) => u.id === userId ? { ...u, active: !u.active } : u));
+  }
+
+  // ── Stats ──
+  const totalStaff = users.filter((u) => !["learner","parent"].includes(u.role)).length;
+  const totalLearners = users.filter((u) => u.role === "learner").length;
+  const inactive = users.filter((u) => !u.active).length;
+
+  return (
+    <div style={{ padding: 24, maxWidth: 1100 }}>
+
+      {/* Header */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 20 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{ width: 48, height: 48, borderRadius: 10, background: "#EDE9FE", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Users size={22} color="#7C3AED" />
+          </div>
+          <div>
+            <h1 style={{ fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 600 }}>User Management</h1>
+            <p style={{ fontSize: 14, color: "var(--color-slate)" }}>Add, edit and manage school accounts</p>
+          </div>
+        </div>
+        <button onClick={() => { setEditingUser(null); setShowModal(true); }}
+          style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 20px", border: "none", borderRadius: 8, background: "#7C3AED", color: "#FFF", cursor: "pointer", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-body)" }}>
+          <Plus size={16} /> Add User
+        </button>
+      </div>
+
+      {/* Stats */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
+        {[
+          { lb: "Total Users",   val: users.length,   c: "#7C3AED" },
+          { lb: "Staff",         val: totalStaff,      c: "#0891B2" },
+          { lb: "Learners",      val: totalLearners,   c: "#059669" },
+          { lb: "Inactive",      val: inactive,        c: inactive > 0 ? "#DC2626" : "#64748B" },
+        ].map((s, i) => (
+          <div key={i} style={{ flex: 1, padding: "12px 16px", background: "#FFF", border: "1px solid #E2E8F0", borderRadius: 10, textAlign: "center" }}>
+            <div style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 700, color: s.c }}>{s.val}</div>
+            <div style={{ fontSize: 11, color: "#94A3B8" }}>{s.lb}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Filters */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap", alignItems: "center" }}>
+        {/* Role filter */}
+        <div style={{ position: "relative" }}>
+          <button onClick={() => setShowRoleDrop(!showRoleDrop)}
+            style={{ display: "flex", alignItems: "center", gap: 8, padding: "9px 14px", background: roleFilter !== "all" ? "#EDE9FE" : "#FFF", border: "1.5px solid " + (roleFilter !== "all" ? "#7C3AED" : "#E2E8F0"), borderRadius: 8, cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: roleFilter !== "all" ? 600 : 400, color: roleFilter !== "all" ? "#7C3AED" : "#64748B", minWidth: 150 }}>
+            <Shield size={14} />
+            <span style={{ flex: 1, textAlign: "left" }}>{roleFilter === "all" ? "All Roles" : roleInfo(roleFilter).label}</span>
+            <ChevronDown size={13} style={{ transform: showRoleDrop ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
+          </button>
+          {showRoleDrop && (
+            <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, minWidth: 180, background: "#FFF", border: "1.5px solid #E2E8F0", borderRadius: 10, boxShadow: "0 12px 32px rgba(0,0,0,0.1)", zIndex: 50, overflow: "hidden" }}>
+              <button onClick={() => { setRoleFilter("all"); setShowRoleDrop(false); }}
+                style={{ width: "100%", padding: "10px 14px", border: "none", borderBottom: "1px solid #F1F5F9", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, textAlign: "left", background: roleFilter === "all" ? "#EDE9FE" : "transparent", color: roleFilter === "all" ? "#7C3AED" : "inherit" }}>
+                All Roles
+              </button>
+              {ROLES.map((r) => (
+                <button key={r.id} onClick={() => { setRoleFilter(r.id); setShowRoleDrop(false); }}
+                  style={{ width: "100%", padding: "10px 14px", border: "none", borderBottom: "1px solid #F1F5F9", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, textAlign: "left", background: roleFilter === r.id ? r.bg : "transparent", color: roleFilter === r.id ? r.color : "inherit", fontWeight: roleFilter === r.id ? 600 : 400 }}>
+                  {r.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Status filter */}
+        <div style={{ display: "flex", background: "#F8FAFC", border: "1px solid #E2E8F0", borderRadius: 8, overflow: "hidden" }}>
+          {[{ k: "all", lb: "All" }, { k: "active", lb: "Active" }, { k: "inactive", lb: "Inactive" }].map((v) => (
+            <button key={v.k} onClick={() => setStatusFilter(v.k)}
+              style={{ padding: "9px 14px", border: "none", borderRight: v.k !== "inactive" ? "1px solid #E2E8F0" : "none", cursor: "pointer", background: statusFilter === v.k ? "#FFF" : "transparent", color: statusFilter === v.k ? "#7C3AED" : "#64748B", fontFamily: "var(--font-body)", fontSize: 13, fontWeight: statusFilter === v.k ? 600 : 400 }}>
+              {v.lb}
+            </button>
+          ))}
+        </div>
+
+        {/* Search */}
+        <div style={{ position: "relative", flex: 1, minWidth: 200 }}>
+          <Search size={15} color="#94A3B8" style={{ position: "absolute", left: 12, top: 11 }} />
+          <input type="text" value={search} onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search by name, username, email…"
+            style={{ width: "100%", padding: "9px 14px 9px 36px", fontSize: 13, fontFamily: "var(--font-body)", border: "1.5px solid #E2E8F0", borderRadius: 8, color: "var(--color-navy)", outline: "none", boxSizing: "border-box" }} />
+          {search && <button onClick={() => setSearch("")} style={{ position: "absolute", right: 10, top: 9, background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}><X size={15} /></button>}
+        </div>
+      </div>
+
+      {/* User table */}
+      <div style={{ background: "#FFF", border: "1px solid #E2E8F0", borderRadius: 12, overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 14 }}>
+          <thead>
+            <tr style={{ background: "#F8FAFC" }}>
+              {["User","Username","Role","Contact","Subjects / Grade","Status","Actions"].map((h, i) => (
+                <th key={i} style={{ textAlign: "left", padding: "12px 14px", fontSize: 11, fontWeight: 600, color: "#94A3B8", textTransform: "uppercase", letterSpacing: "0.05em", whiteSpace: "nowrap" }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {filtered.map((u, i) => {
+              const ri = roleInfo(u.role);
+              return (
+                <tr key={u.id}
+                  style={{ borderBottom: "1px solid #F1F5F9", opacity: u.active ? 1 : 0.55, transition: "opacity 0.2s" }}
+                  onMouseEnter={(e) => e.currentTarget.style.background = "#FAFAFA"}
+                  onMouseLeave={(e) => e.currentTarget.style.background = "transparent"}>
+                  <td style={{ padding: "13px 14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <div style={{ width: 36, height: 36, borderRadius: "50%", background: ri.bg, color: ri.color, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                        {u.firstName[0]}{u.lastName[0]}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, color: "var(--color-navy)" }}>{u.firstName} {u.lastName}</div>
+                        {u.email && <div style={{ fontSize: 12, color: "#94A3B8" }}>{u.email}</div>}
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{ padding: "13px 14px" }}>
+                    <code style={{ fontSize: 12, background: "#F8FAFC", padding: "3px 8px", borderRadius: 6, color: "#475569", border: "1px solid #E2E8F0" }}>{u.username}</code>
+                  </td>
+                  <td style={{ padding: "13px 14px" }}>
+                    <span style={{ padding: "4px 10px", borderRadius: 99, fontSize: 12, fontWeight: 600, background: ri.bg, color: ri.color }}>{ri.label}</span>
+                  </td>
+                  <td style={{ padding: "13px 14px", color: "#64748B", fontSize: 13 }}>
+                    {u.phone && <div style={{ display: "flex", alignItems: "center", gap: 4 }}><Phone size={11} />{u.phone}</div>}
+                    {!u.phone && !u.email && <span style={{ color: "#CBD5E1" }}>—</span>}
+                  </td>
+                  <td style={{ padding: "13px 14px" }}>
+                    {u.subjects?.length > 0 && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                        {u.subjects.map((s) => <span key={s} style={{ fontSize: 11, padding: "2px 7px", background: "#EDE9FE", color: "#7C3AED", borderRadius: 99, fontWeight: 600 }}>{s}</span>)}
+                      </div>
+                    )}
+                    {u.grade && <span style={{ fontSize: 11, padding: "2px 7px", background: "#D1FAE5", color: "#059669", borderRadius: 99, fontWeight: 600 }}>{u.grade}</span>}
+                    {!u.subjects?.length && !u.grade && <span style={{ color: "#CBD5E1", fontSize: 13 }}>—</span>}
+                  </td>
+                  <td style={{ padding: "13px 14px" }}>
+                    <span style={{ padding: "4px 10px", borderRadius: 99, fontSize: 12, fontWeight: 600, background: u.active ? "#D1FAE5" : "#FEE2E2", color: u.active ? "#059669" : "#DC2626" }}>
+                      {u.active ? "Active" : "Inactive"}
+                    </span>
+                  </td>
+                  <td style={{ padding: "13px 14px" }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => { setEditingUser(u); setShowModal(true); }}
+                        title="Edit user"
+                        style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", border: "1.5px solid #E2E8F0", borderRadius: 6, background: "#FFF", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "#64748B", fontFamily: "var(--font-body)" }}
+                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = "#7C3AED"; e.currentTarget.style.color = "#7C3AED"; }}
+                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = "#E2E8F0"; e.currentTarget.style.color = "#64748B"; }}>
+                        <Edit3 size={11} /> Edit
+                      </button>
+                      <button onClick={() => toggleActive(u.id)}
+                        title={u.active ? "Deactivate" : "Activate"}
+                        style={{ display: "flex", alignItems: "center", gap: 4, padding: "5px 10px", border: "1.5px solid " + (u.active ? "#FECACA" : "#D1FAE5"), borderRadius: 6, background: "#FFF", cursor: "pointer", fontSize: 12, fontWeight: 600, color: u.active ? "#DC2626" : "#059669", fontFamily: "var(--font-body)" }}>
+                        {u.active ? <><UserX size={11} /> Deactivate</> : <><UserCheck size={11} /> Activate</>}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+            {filtered.length === 0 && (
+              <tr><td colSpan={7} style={{ padding: 48, textAlign: "center", color: "#94A3B8" }}>
+                <Users size={32} color="#E2E8F0" style={{ display: "block", margin: "0 auto 8px" }} />
+                No users match your filters
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+
+      <div style={{ padding: "10px 0", fontSize: 13, color: "#94A3B8", textAlign: "right" }}>
+        {filtered.length} of {users.length} users shown
+      </div>
+
+      {/* Modal */}
+      {showModal && (
+        <UserFormModal
+          user={editingUser}
+          onClose={() => { setShowModal(false); setEditingUser(null); }}
+          onSave={handleSave}
+        />
+      )}
+
+      <style>{`
+        @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── STYLE HELPERS ────────────────────────────────────────────────────────────
+
+const lbl = { fontSize: 12, fontWeight: 600, color: "#64748B", display: "block", marginBottom: 5, textTransform: "uppercase", letterSpacing: "0.05em" };
+const inp = { width: "100%", padding: "10px 14px", border: "1.5px solid #E2E8F0", borderRadius: 8, fontFamily: "var(--font-body)", fontSize: 14, color: "var(--color-navy)", outline: "none", boxSizing: "border-box" };
+const err = { fontSize: 11, color: "#DC2626", marginTop: 3 };

@@ -9,6 +9,8 @@ import WeeklyPlannerPage from "./pages/WeeklyPlannerPage";
 import LearnersPage from "./pages/LearnersPage";
 import HODDashboardPage from "./pages/HODDashboardPage";
 import ManagementDashboardPage from "./pages/ManagementDashboardPage";
+import TimetablePage from "./pages/TimetablePage";
+import UserManagementPage from "./pages/UserManagementPage";
 import PlaceholderPage from "./pages/PlaceholderPage";
 
 function ProtectedLayout() {
@@ -49,6 +51,8 @@ export default function App() {
             <Route path="/attendance" element={<AttendancePage />} />
             <Route path="/planning" element={<WeeklyPlannerPage />} />
             <Route path="/learners" element={<LearnersPage />} />
+            <Route path="/timetable" element={<TimetablePage />} />
+            <Route path="/users" element={<UserManagementPage />} />
             <Route path="/behaviour" element={<PlaceholderPage title="Behaviour Tracking" />} />
             <Route path="/assessments" element={<PlaceholderPage title="Assessments & Marks" />} />
             <Route path="/calendar" element={<PlaceholderPage title="School Calendar" />} />
