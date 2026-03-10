@@ -3,69 +3,111 @@ import { useAuth } from "../context/AuthContext";
 import {
   Users, ClipboardCheck, BookCopy, AlertTriangle,
   Clock, CheckCircle2, ArrowRight,
-  ChevronLeft, ChevronRight, Play,
+  ChevronLeft, ChevronRight, Play, Loader2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const SCHEDULE = [
-  { id: 1, period: "P1", start: "07:45", end: "08:30", subject: "Mathematics", class: "10A", type: "lesson" },
-  { id: 2, period: "P2", start: "08:30", end: "09:15", subject: "Mathematics", class: "10B", type: "lesson" },
-  { id: 3, period: "P3", start: "09:15", end: "10:00", subject: "Mathematics", class: "10C", type: "lesson" },
-  { id: 0, period: "—",  start: "10:00", end: "10:20", subject: "Break", class: "", type: "break" },
-  { id: 4, period: "P4", start: "10:20", end: "11:05", subject: "Mathematics", class: "11A", type: "lesson" },
-  { id: 5, period: "P5", start: "11:05", end: "11:50", subject: "Mathematics", class: "11B", type: "lesson" },
-  { id: 6, period: "P6", start: "11:50", end: "12:35", subject: "Free Period", class: "", type: "free" },
-  { id: 0, period: "—",  start: "12:35", end: "13:00", subject: "Lunch", class: "", type: "break" },
-  { id: 7, period: "P7", start: "13:00", end: "13:45", subject: "Mathematics", class: "12A", type: "lesson" },
-];
+import { getMySlots, getPendingApprovals } from "../api/client";
 
 function timeToMinutes(timeStr) {
+  if (!timeStr) return 0;
   const [h, m] = timeStr.split(":").map(Number);
   return h * 60 + m;
 }
 
-function getCurrentPeriodIndex() {
+function getCurrentPeriodIndex(schedule) {
+  if (!schedule || schedule.length === 0) return 0;
   const now = new Date();
   const nowMin = now.getHours() * 60 + now.getMinutes();
-  for (let i = 0; i < SCHEDULE.length; i++) {
-    const start = timeToMinutes(SCHEDULE[i].start);
-    const end = timeToMinutes(SCHEDULE[i].end);
+  for (let i = 0; i < schedule.length; i++) {
+    const start = timeToMinutes(schedule[i].start);
+    const end = timeToMinutes(schedule[i].end);
     if (nowMin >= start && nowMin < end) return i;
   }
-  if (nowMin < timeToMinutes(SCHEDULE[0].start)) return 0;
-  return SCHEDULE.length - 1;
+  if (nowMin < timeToMinutes(schedule[0].start)) return 0;
+  return schedule.length - 1;
 }
 
-function getStatus(index, activePeriod) {
+function getStatus(index, activePeriod, schedule) {
   if (index < activePeriod) return "done";
   if (index === activePeriod) return "current";
-  if (SCHEDULE[index].type === "break") return "break";
-  if (SCHEDULE[index].type === "free") return "free";
+  if (schedule[index]?.type === "break") return "break";
+  if (schedule[index]?.type === "free") return "free";
   return "upcoming";
 }
 
-const RECENT_ACTIVITY = [
-  { text: "Attendance saved for 10A (P1)", time: "08:32", type: "attendance" },
-  { text: "Lesson plan approved: Algebraic Expressions", time: "Yesterday", type: "plan" },
-  { text: "Behaviour escalation: L. Dlamini (Level 2)", time: "Yesterday", type: "behaviour" },
-  { text: "Assessment marks captured: Term 1 Test 1", time: "2 days ago", type: "assessment" },
-  { text: "Reflection submitted: Number Patterns", time: "3 days ago", type: "reflection" },
-];
+// Transform API slot data to schedule format
+function transformSlotsToSchedule(slotsData) {
+  if (!slotsData || !slotsData.slots) return [];
+
+  // Get today's day abbreviation
+  const dayMap = { 0: "SUN", 1: "MON", 2: "TUE", 3: "WED", 4: "THU", 5: "FRI", 6: "SAT" };
+  const today = dayMap[new Date().getDay()];
+
+  // Filter slots for today and sort by period
+  const todaySlots = slotsData.slots
+    .filter(slot => slot.day === today)
+    .sort((a, b) => a.period - b.period);
+
+  // Transform to schedule format
+  return todaySlots.map(slot => ({
+    id: slot.id,
+    period: slot.is_break ? "—" : `P${slot.period}`,
+    start: slot.start_time?.slice(0, 5) || "",
+    end: slot.end_time?.slice(0, 5) || "",
+    subject: slot.subject || (slot.is_break ? "Break" : "Free Period"),
+    class: slot.classroom || "",
+    type: slot.is_break ? "break" : (slot.subject ? "lesson" : "free"),
+    classroom_id: slot.classroom_id,
+  }));
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activePeriod, setActivePeriod] = useState(getCurrentPeriodIndex());
+  const [schedule, setSchedule] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [activePeriod, setActivePeriod] = useState(0);
   const [useAutoTrack, setUseAutoTrack] = useState(true);
   const [hoveredPeriod, setHoveredPeriod] = useState(null);
+  const [schoolName, setSchoolName] = useState("Your School");
 
+  // Fetch timetable and pending approvals
   useEffect(() => {
-    if (!useAutoTrack) return;
+    async function loadData() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const [slotsRes, pendingRes] = await Promise.all([
+          getMySlots(),
+          getPendingApprovals().catch(() => ({ data: [] }))
+        ]);
+
+        const transformedSchedule = transformSlotsToSchedule(slotsRes.data);
+        setSchedule(transformedSchedule);
+        setActivePeriod(getCurrentPeriodIndex(transformedSchedule));
+        setPendingCount(Array.isArray(pendingRes.data) ? pendingRes.data.length : 0);
+
+      } catch (err) {
+        console.error("Failed to load dashboard data:", err);
+        setError("Failed to load timetable. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, []);
+
+  // Auto-track current period
+  useEffect(() => {
+    if (!useAutoTrack || schedule.length === 0) return;
     const interval = setInterval(() => {
-      setActivePeriod(getCurrentPeriodIndex());
+      setActivePeriod(getCurrentPeriodIndex(schedule));
     }, 60000);
     return () => clearInterval(interval);
-  }, [useAutoTrack]);
+  }, [useAutoTrack, schedule]);
 
   const goToPrevious = () => {
     setUseAutoTrack(false);
@@ -74,12 +116,12 @@ export default function DashboardPage() {
 
   const goToNext = () => {
     setUseAutoTrack(false);
-    setActivePeriod((prev) => Math.min(SCHEDULE.length - 1, prev + 1));
+    setActivePeriod((prev) => Math.min(schedule.length - 1, prev + 1));
   };
 
   const goToLive = () => {
     setUseAutoTrack(true);
-    setActivePeriod(getCurrentPeriodIndex());
+    setActivePeriod(getCurrentPeriodIndex(schedule));
   };
 
   const navigateToAttendance = (lesson) => {
@@ -106,15 +148,15 @@ export default function DashboardPage() {
     });
   };
 
-  const currentLesson = SCHEDULE[activePeriod];
-  const completedCount = SCHEDULE.filter((_, i) => getStatus(i, activePeriod) === "done" && SCHEDULE[i].type === "lesson").length;
-  const totalLessons = SCHEDULE.filter((s) => s.type === "lesson").length;
+  const currentLesson = schedule[activePeriod] || {};
+  const completedCount = schedule.filter((_, i) => getStatus(i, activePeriod, schedule) === "done" && schedule[i].type === "lesson").length;
+  const totalLessons = schedule.filter((s) => s.type === "lesson").length;
 
   const QUICK_STATS = [
     { label: "Today's Classes", value: `${totalLessons}`, sub: `${completedCount} completed`, icon: Clock, color: "var(--color-info)", bg: "var(--color-info-light)" },
-    { label: "Attendance Rate", value: "94%", sub: "This week", icon: ClipboardCheck, color: "var(--color-success)", bg: "var(--color-success-light)" },
-    { label: "Pending Plans", value: "3", sub: "Awaiting approval", icon: BookCopy, color: "var(--color-accent)", bg: "var(--color-accent-light)" },
-    { label: "Behaviour Alerts", value: "2", sub: "Escalations active", icon: AlertTriangle, color: "var(--color-danger)", bg: "var(--color-danger-light)" },
+    { label: "Attendance Rate", value: "—", sub: "This week", icon: ClipboardCheck, color: "var(--color-success)", bg: "var(--color-success-light)" },
+    { label: "Pending Plans", value: `${pendingCount}`, sub: "Awaiting approval", icon: BookCopy, color: "var(--color-accent)", bg: "var(--color-accent-light)" },
+    { label: "Behaviour Alerts", value: "—", sub: "Escalations", icon: AlertTriangle, color: "var(--color-danger)", bg: "var(--color-danger-light)" },
   ];
 
   const greeting = () => {
@@ -124,13 +166,40 @@ export default function DashboardPage() {
     return "Good evening";
   };
 
+  // Loading state
+  if (loading) {
+    return (
+      <div style={{ ...styles.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
+        <div style={{ textAlign: "center" }}>
+          <Loader2 size={32} color="var(--color-accent)" style={{ animation: "spin 1s linear infinite" }} />
+          <p style={{ marginTop: 16, color: "var(--color-slate)" }}>Loading your dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div style={{ ...styles.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
+        <div style={{ textAlign: "center", padding: 32, background: "var(--color-danger-light)", borderRadius: 12 }}>
+          <AlertTriangle size={32} color="var(--color-danger)" />
+          <p style={{ marginTop: 12, color: "var(--color-danger)", fontWeight: 500 }}>{error}</p>
+          <button onClick={() => window.location.reload()} style={{ marginTop: 16, padding: "8px 16px", background: "var(--color-danger)", color: "#FFF", border: "none", borderRadius: 6, cursor: "pointer" }}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={styles.page}>
       {/* Header */}
       <div style={styles.header}>
         <div>
           <h1 style={styles.greeting}>{greeting()}, {user?.first_name}</h1>
-          <p style={styles.subtitle}>Here's what's happening today at Greenfield High.</p>
+          <p style={styles.subtitle}>Here's what's happening today.</p>
         </div>
         <div style={styles.dateBox}>
           <div style={styles.dateDay}>{new Date().toLocaleDateString("en-ZA", { weekday: "long" })}</div>
@@ -139,7 +208,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Current Period Hero Card */}
-      {currentLesson.type === "lesson" && (
+      {currentLesson && currentLesson.type === "lesson" && (
         <div style={styles.heroCard} className="animate-in">
           <div style={styles.heroLeft}>
             <div style={styles.heroLabel}>{useAutoTrack ? "CURRENT PERIOD" : "VIEWING PERIOD"}</div>
@@ -184,13 +253,18 @@ export default function DashboardPage() {
               {!useAutoTrack && (
                 <button onClick={goToLive} style={styles.liveBtn} title="Jump to current time"><Play size={12} /> LIVE</button>
               )}
-              <button onClick={goToNext} disabled={activePeriod === SCHEDULE.length - 1} style={styles.navBtn}><ChevronRight size={16} /></button>
+              <button onClick={goToNext} disabled={activePeriod === schedule.length - 1} style={styles.navBtn}><ChevronRight size={16} /></button>
             </div>
           </div>
 
           <div style={styles.scheduleList}>
-            {SCHEDULE.map((item, i) => {
-              const status = getStatus(i, activePeriod);
+            {schedule.length === 0 ? (
+              <div style={{ padding: 32, textAlign: "center", color: "var(--color-slate-light)" }}>
+                <Clock size={32} color="var(--color-border)" />
+                <p style={{ marginTop: 12 }}>No classes scheduled for today</p>
+              </div>
+            ) : schedule.map((item, i) => {
+              const status = getStatus(i, activePeriod, schedule);
               const isLesson = item.type === "lesson";
               const isHovered = hoveredPeriod === i && isLesson;
 
@@ -299,21 +373,15 @@ export default function DashboardPage() {
               <h2 style={styles.cardTitle}>Recent Activity</h2>
             </div>
             <div style={styles.activityList}>
-              {RECENT_ACTIVITY.map((item, i) => (
-                <div key={i} style={styles.activityItem}>
-                  <div style={{
-                    ...styles.activityDot,
-                    background: item.type === "behaviour" ? "var(--color-danger)"
-                      : item.type === "attendance" ? "var(--color-success)" : "var(--color-info)",
-                  }} />
-                  <div style={styles.activityText}>{item.text}</div>
-                  <div style={styles.activityTime}>{item.time}</div>
-                </div>
-              ))}
+              <div style={{ padding: 24, textAlign: "center", color: "var(--color-slate-light)" }}>
+                <Clock size={24} color="var(--color-border)" />
+                <p style={{ marginTop: 8, fontSize: 13 }}>Activity tracking coming soon</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
+      <style dangerouslySetInnerHTML={{__html:"@keyframes spin{to{transform:rotate(360deg)}}"}}/>
     </div>
   );
 }

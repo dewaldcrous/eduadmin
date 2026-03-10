@@ -3,29 +3,10 @@ import { useAuth } from "../context/AuthContext";
 import { useLocation } from "react-router-dom";
 import {
   ClipboardCheck, Check, X, Clock, Search,
-  ChevronDown, Save, Loader2, ArrowLeft,
+  ChevronDown, Save, Loader2, ArrowLeft, AlertTriangle,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-
-const DEMO_CLASSES = [
-  { id: 1, name: "10A", subject: "Mathematics", period: "P1", time: "07:45 – 08:30" },
-  { id: 2, name: "10B", subject: "Mathematics", period: "P2", time: "08:30 – 09:15" },
-  { id: 3, name: "10C", subject: "Mathematics", period: "P3", time: "09:15 – 10:00" },
-  { id: 4, name: "11A", subject: "Mathematics", period: "P4", time: "10:20 – 11:05" },
-  { id: 5, name: "11B", subject: "Mathematics", period: "P5", time: "11:05 – 11:50" },
-  { id: 7, name: "12A", subject: "Mathematics", period: "P7", time: "13:00 – 13:45" },
-];
-
-const DEMO_LEARNERS = [
-  "Lerato Mokoena", "Ethan Van der Merwe", "Thandi Naidoo", "Sipho Dlamini",
-  "Priya Williams", "Kagiso Botha", "Zanele Pillay", "Bongani Zulu",
-  "Emma Maharaj", "Neo September", "Aisha Smith", "Tshepo Fourie",
-  "Naledi Govender", "Mandla Mahlangu", "Chloe Khoza", "David Louw",
-  "Palesa Jordaan", "Rajan Erasmus", "Lindiwe Cloete", "Ahmed Patel",
-  "Kefilwe Ngcobo", "Jason Venter", "Sarah Modise", "Michael Adams",
-  "Ava Petersen", "Luke Khumalo", "Lisa Sithole", "Liam Mthembu",
-  "Nomsa Ndlovu", "Thabo Cele",
-];
+import { getMySlots, getClassRoster, getAttendance, saveAttendance } from "../api/client";
 
 export default function AttendancePage() {
   const { user } = useAuth();
@@ -33,12 +14,8 @@ export default function AttendancePage() {
   const navigate = useNavigate();
   const incomingState = location.state;
 
-  // Find the matching class from navigation state, or default to first
-  const initialClass = incomingState?.slotId
-    ? DEMO_CLASSES.find((c) => c.id === incomingState.slotId) || DEMO_CLASSES[0]
-    : DEMO_CLASSES[0];
-
-  const [selectedClass, setSelectedClass] = useState(initialClass);
+  const [classes, setClasses] = useState([]);
+  const [selectedClass, setSelectedClass] = useState(null);
   const [showClassPicker, setShowClassPicker] = useState(false);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
@@ -48,27 +25,104 @@ export default function AttendancePage() {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [showFromDashboard, setShowFromDashboard] = useState(!!incomingState?.slotId);
+  const [loading, setLoading] = useState(true);
+  const [loadingLearners, setLoadingLearners] = useState(false);
+  const [error, setError] = useState(null);
 
-  // Initialize all learners as "present"
+  // Load classes from API
   useEffect(() => {
-    const defaults = {};
-    DEMO_LEARNERS.forEach((name, i) => {
-      defaults[i] = { name, status: "present", reason: "" };
-    });
-    setRecords(defaults);
-    setSaved(false);
-  }, [selectedClass]);
+    async function loadClasses() {
+      try {
+        setLoading(true);
+        setError(null);
+        const res = await getMySlots();
 
-  // Update selected class when navigating from dashboard
-  useEffect(() => {
-    if (incomingState?.slotId) {
-      const match = DEMO_CLASSES.find((c) => c.id === incomingState.slotId);
-      if (match) {
-        setSelectedClass(match);
-        setShowFromDashboard(true);
+        // Transform slots to class format, filter out breaks
+        const slots = (res.data.slots || [])
+          .filter(slot => !slot.is_break && slot.classroom)
+          .map(slot => ({
+            id: slot.id,
+            name: slot.classroom,
+            subject: slot.subject || "Class",
+            period: `P${slot.period}`,
+            time: `${slot.start_time?.slice(0, 5) || ""} – ${slot.end_time?.slice(0, 5) || ""}`,
+            classroom_id: slot.classroom_id,
+          }));
+
+        setClasses(slots);
+
+        // Set initial class from navigation state or first available
+        if (incomingState?.slotId) {
+          const match = slots.find(c => c.id === incomingState.slotId);
+          if (match) {
+            setSelectedClass(match);
+            setShowFromDashboard(true);
+          } else if (slots.length > 0) {
+            setSelectedClass(slots[0]);
+          }
+        } else if (slots.length > 0) {
+          setSelectedClass(slots[0]);
+        }
+      } catch (err) {
+        console.error("Failed to load classes:", err);
+        setError("Failed to load your timetable. Please try again.");
+      } finally {
+        setLoading(false);
       }
     }
-  }, [incomingState]);
+    loadClasses();
+  }, []);
+
+  // Load learners when class is selected
+  useEffect(() => {
+    async function loadLearners() {
+      if (!selectedClass?.classroom_id) return;
+
+      try {
+        setLoadingLearners(true);
+        setSaved(false);
+
+        // Get roster for the classroom
+        const rosterRes = await getClassRoster(selectedClass.classroom_id);
+        const learners = rosterRes.data.learners || [];
+
+        // Initialize records with learners
+        const defaults = {};
+        learners.forEach((learner, i) => {
+          defaults[learner.id] = {
+            learnerId: learner.id,
+            name: `${learner.first_name} ${learner.last_name}`,
+            status: "present",
+            reason: "",
+          };
+        });
+
+        // Try to load existing attendance for this slot and date
+        if (selectedClass.id && selectedDate) {
+          try {
+            const attRes = await getAttendance(selectedClass.id, selectedDate);
+            const existing = attRes.data || [];
+            existing.forEach(rec => {
+              if (defaults[rec.learner]) {
+                defaults[rec.learner].status = rec.status;
+                defaults[rec.learner].reason = rec.absence_reason || "";
+              }
+            });
+          } catch (e) {
+            // No existing attendance, that's fine
+          }
+        }
+
+        setRecords(defaults);
+      } catch (err) {
+        console.error("Failed to load learners:", err);
+        setRecords({});
+      } finally {
+        setLoadingLearners(false);
+      }
+    }
+    loadLearners();
+  }, [selectedClass, selectedDate]);
 
   const setStatus = (id, status) => {
     setRecords((prev) => ({
@@ -95,10 +149,27 @@ export default function AttendancePage() {
   };
 
   const handleSave = async () => {
+    if (!selectedClass) return;
+
     setSaving(true);
-    await new Promise((r) => setTimeout(r, 800));
-    setSaving(false);
-    setSaved(true);
+    try {
+      const data = {
+        timetable_slot: selectedClass.id,
+        date: selectedDate,
+        records: Object.entries(records).map(([id, rec]) => ({
+          learner: rec.learnerId,
+          status: rec.status,
+          absence_reason: rec.reason || "",
+        })),
+      };
+      await saveAttendance(data);
+      setSaved(true);
+    } catch (err) {
+      console.error("Failed to save attendance:", err);
+      alert("Failed to save attendance. Please try again.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   const filteredLearners = Object.entries(records).filter(([_, rec]) =>
@@ -110,6 +181,48 @@ export default function AttendancePage() {
     absent: Object.values(records).filter((r) => r.status === "absent").length,
     late: Object.values(records).filter((r) => r.status === "late").length,
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div style={{ ...styles.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
+        <div style={{ textAlign: "center" }}>
+          <Loader2 size={32} color="var(--color-success)" style={{ animation: "spin 1s linear infinite" }} />
+          <p style={{ marginTop: 16, color: "var(--color-slate)" }}>Loading attendance...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div style={{ ...styles.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
+        <div style={{ textAlign: "center", padding: 32, background: "var(--color-danger-light)", borderRadius: 12 }}>
+          <AlertTriangle size={32} color="var(--color-danger)" />
+          <p style={{ marginTop: 12, color: "var(--color-danger)", fontWeight: 500 }}>{error}</p>
+          <button onClick={() => window.location.reload()} style={{ marginTop: 16, padding: "8px 16px", background: "var(--color-danger)", color: "#FFF", border: "none", borderRadius: 6, cursor: "pointer" }}>
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // No classes available
+  if (classes.length === 0) {
+    return (
+      <div style={{ ...styles.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
+        <div style={{ textAlign: "center", padding: 32 }}>
+          <ClipboardCheck size={48} color="var(--color-border)" />
+          <p style={{ marginTop: 16, color: "var(--color-slate)", fontSize: 16 }}>No classes found in your timetable</p>
+          <button onClick={() => navigate("/")} style={{ marginTop: 16, padding: "10px 20px", background: "var(--color-accent)", color: "#FFF", border: "none", borderRadius: 6, cursor: "pointer" }}>
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={styles.page}>
@@ -178,10 +291,10 @@ export default function AttendancePage() {
         >
           <div>
             <span style={styles.classLabel}>
-              {selectedClass.subject} — {selectedClass.name}
+              {selectedClass?.subject || "Select Class"} — {selectedClass?.name || ""}
             </span>
             <span style={styles.classMeta}>
-              {selectedClass.period} · {selectedClass.time}
+              {selectedClass?.period || ""} · {selectedClass?.time || ""}
             </span>
           </div>
           <ChevronDown
@@ -196,7 +309,7 @@ export default function AttendancePage() {
 
         {showClassPicker && (
           <div style={styles.classPicker}>
-            {DEMO_CLASSES.map((cls) => (
+            {classes.map((cls) => (
               <button
                 key={cls.id}
                 onClick={() => {
@@ -206,15 +319,15 @@ export default function AttendancePage() {
                 }}
                 style={{
                   ...styles.classOption,
-                  background: cls.id === selectedClass.id ? "var(--color-accent-light)" : "transparent",
-                  borderLeft: cls.id === selectedClass.id ? "3px solid var(--color-accent)" : "3px solid transparent",
+                  background: cls.id === selectedClass?.id ? "var(--color-accent-light)" : "transparent",
+                  borderLeft: cls.id === selectedClass?.id ? "3px solid var(--color-accent)" : "3px solid transparent",
                 }}
               >
                 <div>
                   <span style={styles.classOptLabel}>{cls.subject} — {cls.name}</span>
                   <span style={styles.classOptMeta}>{cls.period} · {cls.time}</span>
                 </div>
-                {cls.id === selectedClass.id && <Check size={16} color="var(--color-accent)" />}
+                {cls.id === selectedClass?.id && <Check size={16} color="var(--color-accent)" />}
               </button>
             ))}
           </div>
@@ -255,7 +368,16 @@ export default function AttendancePage() {
 
       {/* Learner List */}
       <div style={styles.listContainer}>
-        {filteredLearners.map(([id, rec], i) => (
+        {loadingLearners ? (
+          <div style={{ padding: 48, textAlign: "center" }}>
+            <Loader2 size={24} color="var(--color-success)" style={{ animation: "spin 1s linear infinite" }} />
+            <p style={{ marginTop: 12, color: "var(--color-slate)" }}>Loading learners...</p>
+          </div>
+        ) : filteredLearners.length === 0 ? (
+          <div style={{ padding: 48, textAlign: "center", color: "var(--color-slate-light)" }}>
+            No learners found for this class
+          </div>
+        ) : filteredLearners.map(([id, rec], i) => (
           <div
             key={id}
             style={{
@@ -265,7 +387,7 @@ export default function AttendancePage() {
             }}
             className="animate-in"
           >
-            <div style={styles.learnerNum}>{parseInt(id) + 1}</div>
+            <div style={styles.learnerNum}>{i + 1}</div>
             <div style={styles.learnerName}>{rec.name}</div>
 
             <div style={styles.statusBtns}>
@@ -309,15 +431,15 @@ export default function AttendancePage() {
         {saved && (
           <div style={styles.savedMsg}>
             <Check size={16} />
-            Attendance saved for {selectedClass.name}
+            Attendance saved for {selectedClass?.name || "class"}
           </div>
         )}
         <button
           onClick={handleSave}
-          disabled={saving}
+          disabled={saving || !selectedClass || loadingLearners}
           style={{
             ...styles.saveBtn,
-            opacity: saving ? 0.7 : 1,
+            opacity: (saving || !selectedClass || loadingLearners) ? 0.7 : 1,
           }}
         >
           {saving ? (
@@ -325,7 +447,7 @@ export default function AttendancePage() {
           ) : (
             <Save size={18} />
           )}
-          {saving ? "Saving..." : `Save Attendance — ${selectedClass.name}`}
+          {saving ? "Saving..." : `Save Attendance — ${selectedClass?.name || ""}`}
         </button>
       </div>
 

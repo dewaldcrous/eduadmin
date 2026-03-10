@@ -1,19 +1,13 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useLocation } from "react-router-dom";
 import { BookCopy, Plus, Check, Clock, X, Send, Edit3, AlertCircle, CheckCircle2, FileText, Save, Loader2, Upload, Download, Paperclip, File, ChevronLeft, ChevronRight, Calendar, Palette, Circle, Square, Triangle, Diamond, Star, Hexagon, Trash2 } from "lucide-react";
+import { getWeeklyPlan, createPlan, updatePlan, submitPlan, deliverLesson, uploadAttachments, deleteAttachment, importPlans, exportPlansUrl } from "../api/client";
 
 var DAYS=[{key:"MON",label:"Monday"},{key:"TUE",label:"Tuesday"},{key:"WED",label:"Wednesday"},{key:"THU",label:"Thursday"},{key:"FRI",label:"Friday"}];
 var PT=[{p:1,s:"07:45",e:"08:30"},{p:2,s:"08:30",e:"09:15"},{p:3,s:"09:15",e:"10:00"},{p:4,s:"10:20",e:"11:05"},{p:5,s:"11:05",e:"11:50"},{p:6,s:"11:50",e:"12:35"},{p:7,s:"13:00",e:"13:45"}];
 var COLORS=[{n:"Blue",v:"#2563EB",l:"#DBEAFE"},{n:"Emerald",v:"#059669",l:"#D1FAE5"},{n:"Amber",v:"#D97706",l:"#FEF3C7"},{n:"Rose",v:"#E11D48",l:"#FFE4E6"},{n:"Purple",v:"#7C3AED",l:"#EDE9FE"},{n:"Teal",v:"#0D9488",l:"#CCFBF1"},{n:"Orange",v:"#EA580C",l:"#FFF7ED"},{n:"Indigo",v:"#4F46E5",l:"#E0E7FF"},{n:"Pink",v:"#DB2777",l:"#FCE7F3"},{n:"Slate",v:"#475569",l:"#F1F5F9"}];
 var SHAPES=[{n:"Circle",i:Circle},{n:"Square",i:Square},{n:"Diamond",i:Diamond},{n:"Star",i:Star},{n:"Hexagon",i:Hexagon},{n:"Triangle",i:Triangle}];
 var DEF_CFG={"10A":{c:COLORS[0],s:SHAPES[0]},"10B":{c:COLORS[1],s:SHAPES[1]},"10C":{c:COLORS[2],s:SHAPES[2]},"11A":{c:COLORS[3],s:SHAPES[3]},"11B":{c:COLORS[4],s:SHAPES[4]},"12A":{c:COLORS[5],s:SHAPES[5]}};
-
-var INIT={MON:[{p:1,sub:"Mathematics",cl:"10A",plan:{id:1,t:"Number Patterns",st:"approved",obj:"Identify and extend number patterns",act:"Group work, worksheet",dif:"Visual aids",res:"Textbook Ch.2",del:true,att:[{id:1,n:"Worksheet.pdf",tp:"pdf",sz:245e3},{id:2,n:"Slides.pptx",tp:"pptx",sz:12e5}]}},{p:2,sub:"Mathematics",cl:"10B",plan:{id:2,t:"Number Patterns",st:"approved",obj:"Identify patterns",act:"Group work",dif:"",res:"",del:true,att:[]}},{p:3,sub:"Mathematics",cl:"10C",plan:null},{p:4,sub:"Mathematics",cl:"11A",plan:{id:4,t:"Quadratic Equations",st:"pending",obj:"Solve by factoring",act:"Demo, practice",dif:"",res:"",att:[{id:3,n:"Notes.docx",tp:"docx",sz:89e3}]}},{p:5,sub:"Mathematics",cl:"11B",plan:null}],
-TUE:[{p:1,sub:"Mathematics",cl:"10A",plan:{id:5,t:"Algebraic Expressions",st:"approved",obj:"Simplify expressions",act:"Demo, practice",dif:"",res:"",att:[]}},{p:2,sub:"Mathematics",cl:"10B",plan:{id:6,t:"Algebraic Expressions",st:"draft",obj:"Simplify expressions",act:"Demo, practice",dif:"",res:"",att:[]}},{p:4,sub:"Mathematics",cl:"11A",plan:null},{p:5,sub:"Mathematics",cl:"11B",plan:{id:8,t:"Trig Ratios",st:"rejected",obj:"Calculate trig ratios",act:"Discovery",dif:"",res:"",fb:"Needs differentiation.",att:[]}}],
-WED:[{p:1,sub:"Mathematics",cl:"10A",plan:{id:9,t:"Exponents",st:"approved",obj:"Apply exponent laws",act:"Examples, exit ticket",dif:"Scaffolded worksheet",res:"Textbook Ch.5",att:[{id:4,n:"Exponents.xlsx",tp:"xlsx",sz:56e3}]}},{p:3,sub:"Mathematics",cl:"10C",plan:null},{p:5,sub:"Mathematics",cl:"11B",plan:null},{p:7,sub:"Mathematics",cl:"12A",plan:{id:11,t:"Calculus Limits",st:"approved",obj:"Understand limits",act:"GeoGebra",dif:"",res:"",att:[]}}],
-THU:[{p:2,sub:"Mathematics",cl:"10B",plan:null},{p:3,sub:"Mathematics",cl:"10C",plan:null},{p:4,sub:"Mathematics",cl:"11A",plan:{id:13,t:"Quadratic Formula",st:"draft",obj:"Derive formula",act:"Guided derivation",dif:"",res:"",att:[]}},{p:7,sub:"Mathematics",cl:"12A",plan:null}],
-FRI:[{p:1,sub:"Mathematics",cl:"10A",plan:{id:15,t:"Exponents Practice",st:"approved",obj:"Consolidate laws",act:"Worksheet, peer marking",dif:"3 levels",res:"Printed sheets",att:[]}},{p:2,sub:"Mathematics",cl:"10B",plan:null},{p:3,sub:"Mathematics",cl:"10C",plan:null},{p:5,sub:"Mathematics",cl:"11B",plan:null},{p:7,sub:"Mathematics",cl:"12A",plan:null}]};
 
 var SC={approved:{lb:"Approved",c:"#059669",bg:"#D1FAE5",ic:CheckCircle2},pending:{lb:"Pending",c:"#D97706",bg:"#FEF3C7",ic:Clock},draft:{lb:"Draft",c:"#475569",bg:"#F1F5F9",ic:Edit3},rejected:{lb:"Rejected",c:"#DC2626",bg:"#FEE2E2",ic:X}};
 
@@ -23,12 +17,12 @@ function gWN(d){var dt=new Date(d);dt.setHours(0,0,0,0);dt.setDate(dt.getDate()+
 function fDt(d){return d.toLocaleDateString("en-ZA",{day:"numeric",month:"short"});}
 
 export default function WeeklyPlannerPage(){
-var auth=useAuth();var user=auth.user;
-var fRef=useRef(null);var pfRef=useRef(null);var editFRef=useRef(null);var iRef=useRef(null);
+var auth=useAuth();
+var pfRef=useRef(null);var editFRef=useRef(null);var iRef=useRef(null);
 var today=new Date();var mon0=gMon(today);
 
 var _a=useState(0);var wOff=_a[0];var sWOff=_a[1];
-var _b=useState(JSON.parse(JSON.stringify(INIT)));var wd=_b[0];var sWd=_b[1];
+var _b=useState({});var wd=_b[0];var sWd=_b[1];
 var _c=useState(null);var sp=_c[0];var sSp=_c[1];
 var _d=useState(false);var sCr=_d[0];var ssCr=_d[1];
 var _e=useState(false);var isEd=_e[0];var sIsEd=_e[1];
@@ -43,6 +37,76 @@ var _m=useState(false);var showCfg=_m[0];var sShowCfg=_m[1];
 var _n=useState(null);var cfgCl=_n[0];var sCfgCl=_n[1];
 var _o=useState(100);var nid=_o[0];var sNid=_o[1];
 var _p=useState([]);var editExistAtt=_p[0];var sEditExistAtt=_p[1];
+var _q=useState(true);var loading=_q[0];var sLoading=_q[1];
+var _r=useState(null);var error=_r[0];var sError=_r[1];
+var _s=useState(null);var timetableInfo=_s[0];var sTimetableInfo=_s[1];
+
+// Load weekly plan data from API
+useEffect(function(){
+  async function loadWeeklyPlan(){
+    try{
+      sLoading(true);
+      sError(null);
+      var res=await getWeeklyPlan();
+      var data=res.data;
+      sTimetableInfo({term:data.term,year:data.year,timetable_id:data.timetable_id});
+
+      // Transform API response to weekly data structure
+      var weekly=data.weekly||[];
+      var transformed={};
+      weekly.forEach(function(dayData){
+        var dayKey=dayData.day;
+        var periods=dayData.periods||[];
+        transformed[dayKey]=periods.map(function(p){
+          var plan=p.plan;
+          return{
+            id:p.slot_id,
+            p:p.period,
+            sub:p.subject||"Class",
+            cl:p.classroom||"",
+            plan:plan?{
+              id:plan.id,
+              t:plan.title,
+              st:plan.status,
+              obj:plan.objectives||"",
+              act:plan.activities||"",
+              dif:plan.differentiation||"",
+              res:plan.resources_note||"",
+              del:plan.has_delivery||false,
+              fb:plan.feedback||"",
+              att:(plan.attachments||[]).map(function(a){
+                return{id:a.id,n:a.file_name,tp:a.file_type,sz:a.file_size,url:a.url};
+              })
+            }:null
+          };
+        });
+      });
+      sWd(transformed);
+
+      // Build class config from data
+      var newCfg=Object.assign({},DEF_CFG);
+      var colorIdx=0;
+      Object.values(transformed).forEach(function(slots){
+        slots.forEach(function(s){
+          if(s.cl&&!newCfg[s.cl]){
+            newCfg[s.cl]={c:COLORS[colorIdx%COLORS.length],s:SHAPES[colorIdx%SHAPES.length]};
+            colorIdx++;
+          }
+        });
+      });
+      sCcfg(newCfg);
+
+    }catch(err){
+      console.error("Failed to load weekly plan:",err);
+      sError("Failed to load lesson plans");
+      // Initialize with empty data
+      sWd({MON:[],TUE:[],WED:[],THU:[],FRI:[]});
+    }finally{
+      sLoading(false);
+    }
+  }
+  loadWeeklyPlan();
+},[wOff]);
 
 var cMon=new Date(mon0);cMon.setDate(cMon.getDate()+wOff*7);
 var cFri=new Date(cMon);cFri.setDate(cFri.getDate()+4);
@@ -71,17 +135,112 @@ function openE(plan,slot,dayK){
 }
 
 function doSave(submit){return async function(){
-  sSav(true);await new Promise(function(r){setTimeout(r,600);});
-  var existId=nid;var slots=wd[tgt.day]||[];
-  for(var i=0;i<slots.length;i++){if(slots[i].p===tgt.p&&slots[i].plan)existId=slots[i].plan.id;}
-  var newAtt=pnd.map(function(f,idx){return{id:nid+idx+1,n:f.name,tp:f.name.split(".").pop(),sz:f.size,url:URL.createObjectURL(f)};});
-  var allAtt=isEd?editExistAtt.concat(newAtt):newAtt;
-  var np={id:isEd?existId:nid,t:fm.t,obj:fm.obj,act:fm.act,dif:fm.dif,res:fm.res,st:submit?"pending":"draft",att:allAtt};
-  if(!isEd)sNid(nid+pnd.length+2);
-  var upd=JSON.parse(JSON.stringify(wd));var ds=upd[tgt.day];
-  if(ds){for(var j=0;j<ds.length;j++){if(ds[j].p===tgt.p){if(ds[j].plan&&isEd){np.del=ds[j].plan.del;np.fb=ds[j].plan.fb;}ds[j].plan=np;break;}}}
-  sWd(upd);sSav(false);ssCr(false);
+  sSav(true);
+  try{
+    // Find the slot to get its ID
+    var slots=wd[tgt.day]||[];
+    var slotData=null;
+    var existingPlanId=null;
+    for(var i=0;i<slots.length;i++){
+      if(slots[i].p===tgt.p){
+        slotData=slots[i];
+        if(slots[i].plan)existingPlanId=slots[i].plan.id;
+        break;
+      }
+    }
+
+    // Prepare plan data for API
+    var planData={
+      timetable_slot:slotData?slotData.id:null,
+      title:fm.t,
+      objectives:fm.obj,
+      activities:fm.act,
+      differentiation:fm.dif,
+      resources_note:fm.res
+    };
+
+    var savedPlan;
+    if(isEd&&existingPlanId){
+      // Update existing plan
+      var res=await updatePlan(existingPlanId,planData);
+      savedPlan=res.data;
+    }else{
+      // Create new plan
+      var res=await createPlan(planData);
+      savedPlan=res.data;
+    }
+
+    // Upload any new attachments
+    if(pnd.length>0&&savedPlan&&savedPlan.id){
+      await uploadAttachments(savedPlan.id,pnd,"");
+    }
+
+    // Submit if requested
+    if(submit&&savedPlan&&savedPlan.id){
+      await submitPlan(savedPlan.id);
+    }
+
+    // Update local state
+    var newAtt=pnd.map(function(f,idx){return{id:nid+idx+1,n:f.name,tp:f.name.split(".").pop(),sz:f.size,url:URL.createObjectURL(f)};});
+    var allAtt=isEd?editExistAtt.concat(newAtt):newAtt;
+    var np={id:savedPlan?savedPlan.id:nid,t:fm.t,obj:fm.obj,act:fm.act,dif:fm.dif,res:fm.res,st:submit?"pending":"draft",att:allAtt};
+    if(!isEd)sNid(nid+pnd.length+2);
+    var upd=JSON.parse(JSON.stringify(wd));var ds=upd[tgt.day];
+    if(ds){for(var j=0;j<ds.length;j++){if(ds[j].p===tgt.p){if(ds[j].plan&&isEd){np.del=ds[j].plan.del;np.fb=ds[j].plan.fb;}ds[j].plan=np;break;}}}
+    sWd(upd);ssCr(false);
+  }catch(err){
+    console.error("Failed to save plan:",err);
+    alert("Failed to save lesson plan. Please try again.");
+  }finally{
+    sSav(false);
+  }
 };}
+
+// Handle submit for existing plan
+async function handleSubmitPlan(planId){
+  try{
+    await submitPlan(planId);
+    // Update local state
+    var upd=JSON.parse(JSON.stringify(wd));
+    Object.keys(upd).forEach(function(day){
+      upd[day].forEach(function(s){
+        if(s.plan&&s.plan.id===planId){
+          s.plan.st="pending";
+        }
+      });
+    });
+    sWd(upd);
+    if(sp&&sp.id===planId){
+      sSp(Object.assign({},sp,{st:"pending"}));
+    }
+  }catch(err){
+    console.error("Failed to submit plan:",err);
+    alert("Failed to submit plan. Please try again.");
+  }
+}
+
+// Handle mark as delivered
+async function handleDeliverLesson(planId){
+  try{
+    await deliverLesson(planId,"full",100);
+    // Update local state
+    var upd=JSON.parse(JSON.stringify(wd));
+    Object.keys(upd).forEach(function(day){
+      upd[day].forEach(function(s){
+        if(s.plan&&s.plan.id===planId){
+          s.plan.del=true;
+        }
+      });
+    });
+    sWd(upd);
+    if(sp&&sp.id===planId){
+      sSp(Object.assign({},sp,{del:true}));
+    }
+  }catch(err){
+    console.error("Failed to mark as delivered:",err);
+    alert("Failed to mark lesson as delivered. Please try again.");
+  }
+}
 
 // ─── File handling ──────────────────────────────────────
 function onCreateFiles(e){sPnd(function(p){return p.concat(Array.from(e.target.files));});e.target.value="";}
@@ -99,20 +258,58 @@ function onPanelFiles(e){
   e.target.value="";
 }
 
-function rmPanelAtt(attId){
+async function rmPanelAtt(attId){
   if(!sp)return;
-  var at=(sp.att||[]).filter(function(a){return a.id!==attId;});
-  sSp(Object.assign({},sp,{att:at}));
-  var upd=JSON.parse(JSON.stringify(wd));var ds=upd[sp.day];
-  if(ds){for(var i=0;i<ds.length;i++){if(ds[i].p===sp.slot.p&&ds[i].plan){ds[i].plan.att=at;break;}}}
-  sWd(upd);
+  try{
+    await deleteAttachment(attId);
+    var at=(sp.att||[]).filter(function(a){return a.id!==attId;});
+    sSp(Object.assign({},sp,{att:at}));
+    var upd=JSON.parse(JSON.stringify(wd));var ds=upd[sp.day];
+    if(ds){for(var i=0;i<ds.length;i++){if(ds[i].p===sp.slot.p&&ds[i].plan){ds[i].plan.att=at;break;}}}
+    sWd(upd);
+  }catch(err){
+    console.error("Failed to delete attachment:",err);
+    alert("Failed to delete attachment. Please try again.");
+  }
 }
 
 function dlF(a){var el=document.createElement("a");el.href=a.url||"#";el.download=a.n;if(a.url){document.body.appendChild(el);el.click();document.body.removeChild(el);}else{alert("Download: "+a.n);}}
 
 // ─── Import/Export ──────────────────────────────────────
-async function doImp(e){if(!e.target.files[0])return;sIRes({ld:true});await new Promise(function(r){setTimeout(r,1500);});sIRes({ld:false,cr:3,sk:1,er:["Row 5: Already exists"],tot:4});e.target.value="";}
-function doExp(f){alert("Export "+f.toUpperCase()+"\n/api/v1/planning/export/?format="+f);}
+async function doImp(e){
+  if(!e.target.files[0])return;
+  sIRes({ld:true});
+  try{
+    var res=await importPlans(e.target.files[0]);
+    var data=res.data;
+    sIRes({ld:false,cr:data.created||0,sk:data.skipped||0,er:data.errors||[],tot:data.total_rows||0});
+    // Reload the weekly plan after import
+    var weekRes=await getWeeklyPlan();
+    var weekData=weekRes.data;
+    var weekly=weekData.weekly||[];
+    var transformed={};
+    weekly.forEach(function(dayData){
+      var dayKey=dayData.day;
+      var periods=dayData.periods||[];
+      transformed[dayKey]=periods.map(function(p){
+        var plan=p.plan;
+        return{
+          id:p.slot_id,p:p.period,sub:p.subject||"Class",cl:p.classroom||"",
+          plan:plan?{id:plan.id,t:plan.title,st:plan.status,obj:plan.objectives||"",act:plan.activities||"",dif:plan.differentiation||"",res:plan.resources_note||"",del:plan.has_delivery||false,fb:plan.feedback||"",att:(plan.attachments||[]).map(function(a){return{id:a.id,n:a.file_name,tp:a.file_type,sz:a.file_size,url:a.url};})}:null
+        };
+      });
+    });
+    sWd(transformed);
+  }catch(err){
+    console.error("Import failed:",err);
+    sIRes({ld:false,cr:0,sk:0,er:["Import failed: "+(err.message||"Unknown error")],tot:0});
+  }
+  e.target.value="";
+}
+function doExp(f){
+  var url=exportPlansUrl(f);
+  window.open(url,"_blank");
+}
 function dlTpl(){var csv="day,period,title,objectives,activities,differentiation,resources\nMonday,1,Example,Learners will...,Activity 1,Support,Textbook";var el=document.createElement("a");el.href=URL.createObjectURL(new Blob([csv],{type:"text/csv"}));el.download="lesson_plan_template.csv";document.body.appendChild(el);el.click();document.body.removeChild(el);}
 
 // ─── Class config ───────────────────────────────────────
@@ -137,6 +334,34 @@ function renderFileInput(ref, onChange){
 }
 
 // ─── RENDER ─────────────────────────────────────────────
+
+// Loading state
+if(loading){
+  return(
+    <div style={{padding:24,maxWidth:1200,display:"flex",alignItems:"center",justifyContent:"center",minHeight:400}}>
+      <div style={{textAlign:"center"}}>
+        <Loader2 size={32} color="#D97706" style={{animation:"spin 1s linear infinite"}}/>
+        <p style={{marginTop:16,color:"var(--color-slate)"}}>Loading lesson plans...</p>
+      </div>
+    </div>
+  );
+}
+
+// Error state
+if(error){
+  return(
+    <div style={{padding:24,maxWidth:1200,display:"flex",alignItems:"center",justifyContent:"center",minHeight:400}}>
+      <div style={{textAlign:"center",padding:32,background:"#FEE2E2",borderRadius:12}}>
+        <AlertCircle size={32} color="#DC2626"/>
+        <p style={{marginTop:12,color:"#DC2626",fontWeight:500}}>{error}</p>
+        <button onClick={function(){window.location.reload();}} style={{marginTop:16,padding:"8px 16px",background:"#DC2626",color:"#FFF",border:"none",borderRadius:6,cursor:"pointer"}}>
+          Retry
+        </button>
+      </div>
+    </div>
+  );
+}
+
 return(
 <div style={{padding:24,maxWidth:1200}}>
 {/* HEADER */}
@@ -250,8 +475,8 @@ return <div key={cl}><button onClick={function(){sCfgCl(isO?null:cl);}} style={{
 
 <div style={{display:"flex",gap:8,paddingTop:24,borderTop:"1px solid var(--color-border-light)"}}>
 {(sp.st==="draft"||sp.st==="rejected")&&<button onClick={function(){openE(sp,sp.slot,sp.day);}} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"#DBEAFE",color:"#2563EB",border:"none",borderRadius:6,cursor:"pointer"}}><Edit3 size={14}/> Edit Plan</button>}
-{sp.st==="draft"&&<button style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"#D97706",color:"#FFF",border:"none",borderRadius:6,cursor:"pointer"}}><Send size={14}/> Submit</button>}
-{sp.st==="approved"&&!sp.del&&<button style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"#D1FAE5",color:"#059669",border:"none",borderRadius:6,cursor:"pointer"}}><Check size={14}/> Delivered</button>}
+{sp.st==="draft"&&<button onClick={function(){handleSubmitPlan(sp.id);}} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"#D97706",color:"#FFF",border:"none",borderRadius:6,cursor:"pointer"}}><Send size={14}/> Submit</button>}
+{sp.st==="approved"&&!sp.del&&<button onClick={function(){handleDeliverLesson(sp.id);}} style={{display:"flex",alignItems:"center",gap:6,padding:"10px 18px",fontSize:14,fontWeight:600,fontFamily:"var(--font-body)",background:"#D1FAE5",color:"#059669",border:"none",borderRadius:6,cursor:"pointer"}}><Check size={14}/> Delivered</button>}
 </div>
 </div></div>}
 
