@@ -1,12 +1,93 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import { useLocation } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   ClipboardCheck, Check, X, Clock, Search,
-  ChevronDown, Save, Loader2, ArrowLeft, AlertTriangle,
+  ChevronDown, Save, Loader2, ArrowLeft,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { getMySlots, getClassRoster, getAttendance, saveAttendance } from "../api/client";
+
+// ─── DATA: Each class has its own learner roster ─────────────────────────────
+
+const CLASS_ROSTERS = {
+  1: [ // 10A Mathematics
+    "Lerato Mokoena","Ethan Van der Merwe","Thandi Naidoo","Sipho Dlamini",
+    "Priya Williams","Kagiso Botha","Zanele Pillay","Bongani Zulu",
+    "Emma Maharaj","Neo September","Aisha Smith","Tshepo Fourie",
+    "Naledi Govender","Mandla Mahlangu","Chloe Khoza","David Louw",
+    "Palesa Jordaan","Rajan Erasmus","Lindiwe Cloete","Ahmed Patel",
+    "Kefilwe Ngcobo","Jason Venter","Sarah Modise","Michael Adams",
+    "Ava Petersen","Luke Khumalo","Lisa Sithole","Liam Mthembu",
+    "Nomsa Ndlovu","Thabo Cele",
+  ],
+  2: [ // 10B Mathematics
+    "Siphamandla Dube","Yolande Booysen","Tebogo Molefe","Chantelle Erwee",
+    "Nkosinathi Mkhize","Fatima Ismail","Brendan Steyn","Zanele Mahlangu",
+    "Pieter Marais","Nokwanda Dlamini","Ruvan Pietersen","Asanda Ntanzi",
+    "Jenna Cronje","Sibusiso Cele","Lana Van Zyl","Dumisani Buthelezi",
+    "Carla Botha","Mpendulo Nkosi","Tamsin Fourie","Lwazi Mthethwa",
+    "Natasha Lombard","Sifiso Zulu","Robyn Gerber","Ayanda Ndaba",
+    "Christiaan Du Toit","Nomvula Sithole","Warren Swarts","Phumzile Khumalo",
+    "Shantel Olivier","Buhle Madlala",
+  ],
+  3: [ // 10C Mathematics
+    "Tumelo Mokoena","Alexia De Beer","Sanele Mthembu","Stephanie Harmse",
+    "Lungelo Nxumalo","Bianca Swanepoel","Mvelo Dlamini","Taryn Van Der Berg",
+    "Sibonelo Zwane","Kaylee Engelbrecht","Thulani Msweli","Jade Bosman",
+    "Lungisa Ngcobo","Tanya Loots","Sipho Buthelezi","Marisha Bekker",
+    "Sandile Nkosi","Bianca Britz","Nkosinathi Shabalala","Tarryn Basson",
+    "Mthobisi Mkhize","Carmen Raath","Lindani Mthethwa","Rozanne Botha",
+    "Njabulo Mhlongo","Tamara Myburgh","Thembinkosi Cele","Kirsty Potgieter",
+    "Nqobile Nkosi","Melissa Rademeyer",
+  ],
+  4: [ // 11A Mathematics
+    "Lungelo Shabalala","Bernice Steenkamp","Ntokozo Mthembu","Celeste Uys",
+    "Mthokozisi Nkosi","Danielle Louw","Sipho Msomi","Estelle Van Der Merwe",
+    "Thulane Dlamini","Faye Harmse","Mandisa Mkhize","Gert Fourie",
+    "Nokwazi Ntuli","Hendrik Swanepoel","Siphiwe Zulu","Ilse Botha",
+    "Mfanafuthi Mkhize","Juanita Erasmus","Sithembile Ngcobo","Kyle De Villiers",
+    "Ntombi Shabalala","Leon Joubert","Phiwayinkosi Mthethwa","Megan Visser",
+    "Sandisiwe Cele","Nico Marais","Sifokazi Nkosi","Petra Coetzee",
+    "Thobani Buthelezi","Quinn Jacobs",
+  ],
+  5: [ // 11B Mathematics
+    "Ayanda Mthembu","Rudi Steyn","Busisiwe Nkosi","Sune Bosman",
+    "Dumisani Ndaba","Tiaan Cronje","Hlengiwe Cele","Ulrich Badenhorst",
+    "Jabulani Dube","Vera Potgieter","Khanyisile Mkhize","Willem Fouche",
+    "Lungisani Nxumalo","Xanthe De Beer","Mthembeni Shabalala","Yolande Venter",
+    "Nkosinathi Buthelezi","Zara Swarts","Phumelele Zulu","Albert Lombard",
+    "Qiniso Mthethwa","Bonnie Raath","Rishaad Ismail","Courtney Bekker",
+    "Siyabonga Mhlongo","Dianne Marais","Thando Ntuli","Elan Swanepoel",
+    "Unathi Dlamini","Florette Botha",
+  ],
+  7: [ // 12A Mathematics
+    "Vusi Mthembu","Alicia Steenkamp","Wandile Nkosi","Bronwyn Joubert",
+    "Xolani Shabalala","Cara-Lee Marais","Yenza Dlamini","Deon Cronje",
+    "Zanele Buthelezi","Elrika Venter","Anda Cele","Francois De Villiers",
+    "Bongiwe Mkhize","Gina Coetzee","Cebo Ndaba","Hannelie Lombard",
+    "Dalisu Nxumalo","Ingrid Erasmus","Emihle Zulu","Johan Botha",
+    "Fisani Mthethwa","Karen Harmse","Gugulethu Ntuli","Lize Fourie",
+    "Hlengiwe Shabalala","Morne Potgieter","Isipho Dube","Nadia Bekker",
+    "Jabulani Mhlongo","Olivia Steyn",
+  ],
+};
+
+const DEMO_CLASSES = [
+  { id: 1,  name: "10A", subject: "Mathematics", period: "P1", time: "07:45 – 08:30" },
+  { id: 2,  name: "10B", subject: "Mathematics", period: "P2", time: "08:30 – 09:15" },
+  { id: 3,  name: "10C", subject: "Mathematics", period: "P3", time: "09:15 – 10:00" },
+  { id: 4,  name: "11A", subject: "Mathematics", period: "P4", time: "10:20 – 11:05" },
+  { id: 5,  name: "11B", subject: "Mathematics", period: "P5", time: "11:05 – 11:50" },
+  { id: 7,  name: "12A", subject: "Mathematics", period: "P7", time: "13:00 – 13:45" },
+];
+
+function buildDefaultRecords(classId) {
+  const learners = CLASS_ROSTERS[classId] || [];
+  const defaults = {};
+  learners.forEach((name, i) => {
+    defaults[i] = { name, status: "present", reason: "" };
+  });
+  return defaults;
+}
 
 export default function AttendancePage() {
   const { user } = useAuth();
@@ -14,129 +95,41 @@ export default function AttendancePage() {
   const navigate = useNavigate();
   const incomingState = location.state;
 
-  const [classes, setClasses] = useState([]);
-  const [selectedClass, setSelectedClass] = useState(null);
+  const initialClass = incomingState?.slotId
+    ? DEMO_CLASSES.find((c) => c.id === incomingState.slotId) || DEMO_CLASSES[0]
+    : DEMO_CLASSES[0];
+
+  const [selectedClass, setSelectedClass] = useState(initialClass);
   const [showClassPicker, setShowClassPicker] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [search, setSearch] = useState("");
-  const [records, setRecords] = useState({});
+  const [records, setRecords] = useState(() => buildDefaultRecords(initialClass.id));
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [showFromDashboard, setShowFromDashboard] = useState(!!incomingState?.slotId);
-  const [loading, setLoading] = useState(true);
-  const [loadingLearners, setLoadingLearners] = useState(false);
-  const [error, setError] = useState(null);
+  const [showFromDashboard] = useState(!!incomingState?.slotId);
 
-  // Load classes from API
+  // ── When class changes, load THAT class's roster ──
   useEffect(() => {
-    async function loadClasses() {
-      try {
-        setLoading(true);
-        setError(null);
-        const res = await getMySlots();
+    setRecords(buildDefaultRecords(selectedClass.id));
+    setSearch("");
+    setSaved(false);
+  }, [selectedClass.id]);
 
-        // Transform slots to class format, filter out breaks
-        const slots = (res.data.slots || [])
-          .filter(slot => !slot.is_break && slot.classroom)
-          .map(slot => ({
-            id: slot.id,
-            name: slot.classroom,
-            subject: slot.subject || "Class",
-            period: `P${slot.period}`,
-            time: `${slot.start_time?.slice(0, 5) || ""} – ${slot.end_time?.slice(0, 5) || ""}`,
-            classroom_id: slot.classroom_id,
-          }));
-
-        setClasses(slots);
-
-        // Set initial class from navigation state or first available
-        if (incomingState?.slotId) {
-          const match = slots.find(c => c.id === incomingState.slotId);
-          if (match) {
-            setSelectedClass(match);
-            setShowFromDashboard(true);
-          } else if (slots.length > 0) {
-            setSelectedClass(slots[0]);
-          }
-        } else if (slots.length > 0) {
-          setSelectedClass(slots[0]);
-        }
-      } catch (err) {
-        console.error("Failed to load classes:", err);
-        setError("Failed to load your timetable. Please try again.");
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadClasses();
-  }, []);
-
-  // Load learners when class is selected
+  // ── Handle navigation from dashboard ──
   useEffect(() => {
-    async function loadLearners() {
-      if (!selectedClass?.classroom_id) return;
-
-      try {
-        setLoadingLearners(true);
-        setSaved(false);
-
-        // Get roster for the classroom
-        const rosterRes = await getClassRoster(selectedClass.classroom_id);
-        const learners = rosterRes.data.learners || [];
-
-        // Initialize records with learners
-        const defaults = {};
-        learners.forEach((learner, i) => {
-          defaults[learner.id] = {
-            learnerId: learner.id,
-            name: `${learner.first_name} ${learner.last_name}`,
-            status: "present",
-            reason: "",
-          };
-        });
-
-        // Try to load existing attendance for this slot and date
-        if (selectedClass.id && selectedDate) {
-          try {
-            const attRes = await getAttendance(selectedClass.id, selectedDate);
-            const existing = attRes.data || [];
-            existing.forEach(rec => {
-              if (defaults[rec.learner]) {
-                defaults[rec.learner].status = rec.status;
-                defaults[rec.learner].reason = rec.absence_reason || "";
-              }
-            });
-          } catch (e) {
-            // No existing attendance, that's fine
-          }
-        }
-
-        setRecords(defaults);
-      } catch (err) {
-        console.error("Failed to load learners:", err);
-        setRecords({});
-      } finally {
-        setLoadingLearners(false);
-      }
+    if (incomingState?.slotId) {
+      const match = DEMO_CLASSES.find((c) => c.id === incomingState.slotId);
+      if (match) setSelectedClass(match);
     }
-    loadLearners();
-  }, [selectedClass, selectedDate]);
+  }, [incomingState]);
 
   const setStatus = (id, status) => {
-    setRecords((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], status },
-    }));
+    setRecords((prev) => ({ ...prev, [id]: { ...prev[id], status } }));
     setSaved(false);
   };
 
   const setReason = (id, reason) => {
-    setRecords((prev) => ({
-      ...prev,
-      [id]: { ...prev[id], reason },
-    }));
+    setRecords((prev) => ({ ...prev, [id]: { ...prev[id], reason } }));
   };
 
   const markAllPresent = () => {
@@ -149,27 +142,10 @@ export default function AttendancePage() {
   };
 
   const handleSave = async () => {
-    if (!selectedClass) return;
-
     setSaving(true);
-    try {
-      const data = {
-        timetable_slot: selectedClass.id,
-        date: selectedDate,
-        records: Object.entries(records).map(([id, rec]) => ({
-          learner: rec.learnerId,
-          status: rec.status,
-          absence_reason: rec.reason || "",
-        })),
-      };
-      await saveAttendance(data);
-      setSaved(true);
-    } catch (err) {
-      console.error("Failed to save attendance:", err);
-      alert("Failed to save attendance. Please try again.");
-    } finally {
-      setSaving(false);
-    }
+    await new Promise((r) => setTimeout(r, 800));
+    setSaving(false);
+    setSaved(true);
   };
 
   const filteredLearners = Object.entries(records).filter(([_, rec]) =>
@@ -178,59 +154,17 @@ export default function AttendancePage() {
 
   const counts = {
     present: Object.values(records).filter((r) => r.status === "present").length,
-    absent: Object.values(records).filter((r) => r.status === "absent").length,
-    late: Object.values(records).filter((r) => r.status === "late").length,
+    absent:  Object.values(records).filter((r) => r.status === "absent").length,
+    late:    Object.values(records).filter((r) => r.status === "late").length,
   };
 
-  // Loading state
-  if (loading) {
-    return (
-      <div style={{ ...styles.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
-        <div style={{ textAlign: "center" }}>
-          <Loader2 size={32} color="var(--color-success)" style={{ animation: "spin 1s linear infinite" }} />
-          <p style={{ marginTop: 16, color: "var(--color-slate)" }}>Loading attendance...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div style={{ ...styles.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
-        <div style={{ textAlign: "center", padding: 32, background: "var(--color-danger-light)", borderRadius: 12 }}>
-          <AlertTriangle size={32} color="var(--color-danger)" />
-          <p style={{ marginTop: 12, color: "var(--color-danger)", fontWeight: 500 }}>{error}</p>
-          <button onClick={() => window.location.reload()} style={{ marginTop: 16, padding: "8px 16px", background: "var(--color-danger)", color: "#FFF", border: "none", borderRadius: 6, cursor: "pointer" }}>
-            Retry
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // No classes available
-  if (classes.length === 0) {
-    return (
-      <div style={{ ...styles.page, display: "flex", alignItems: "center", justifyContent: "center", minHeight: 400 }}>
-        <div style={{ textAlign: "center", padding: 32 }}>
-          <ClipboardCheck size={48} color="var(--color-border)" />
-          <p style={{ marginTop: 16, color: "var(--color-slate)", fontSize: 16 }}>No classes found in your timetable</p>
-          <button onClick={() => navigate("/")} style={{ marginTop: 16, padding: "10px 20px", background: "var(--color-accent)", color: "#FFF", border: "none", borderRadius: 6, cursor: "pointer" }}>
-            Back to Dashboard
-          </button>
-        </div>
-      </div>
-    );
-  }
+  const totalLearners = Object.keys(records).length;
 
   return (
     <div style={styles.page}>
-      {/* Back to dashboard link when navigated from there */}
       {showFromDashboard && (
         <button onClick={() => navigate("/")} style={styles.backBtn}>
-          <ArrowLeft size={16} />
-          Back to Dashboard
+          <ArrowLeft size={16} /> Back to Dashboard
         </button>
       )}
 
@@ -245,9 +179,10 @@ export default function AttendancePage() {
             <p style={styles.subtitle}>
               {selectedDate === new Date().toISOString().split("T")[0]
                 ? "Today"
-                : new Date(selectedDate).toLocaleDateString("en-ZA", {
+                : new Date(selectedDate + "T00:00:00").toLocaleDateString("en-ZA", {
                     weekday: "long", day: "numeric", month: "long",
                   })}
+              {" — "}{selectedClass.name} · {selectedClass.subject}
             </p>
           </div>
         </div>
@@ -259,75 +194,43 @@ export default function AttendancePage() {
         />
       </div>
 
-      {/* Pre-selected banner when coming from dashboard */}
-      {showFromDashboard && incomingState && (
-        <div style={styles.preSelectedBanner}>
-          <div style={styles.bannerContent}>
-            <div style={styles.bannerLabel}>Selected from dashboard</div>
-            <div style={styles.bannerTitle}>
-              {incomingState.subject} — {incomingState.className}
-            </div>
-            <div style={styles.bannerMeta}>
-              {incomingState.period} · {incomingState.time}
-            </div>
-          </div>
-          <button
-            onClick={() => setShowFromDashboard(false)}
-            style={styles.bannerDismiss}
-          >
-            Change class
-          </button>
-        </div>
-      )}
-
       {/* Class Selector */}
       <div style={styles.classSelectorWrap}>
         <button
           onClick={() => setShowClassPicker(!showClassPicker)}
-          style={{
-            ...styles.classSelector,
-            borderColor: showClassPicker ? "var(--color-accent)" : "var(--color-border)",
-          }}
+          style={styles.classSelector}
         >
           <div>
             <span style={styles.classLabel}>
-              {selectedClass?.subject || "Select Class"} — {selectedClass?.name || ""}
+              {selectedClass.subject} — {selectedClass.name}
             </span>
             <span style={styles.classMeta}>
-              {selectedClass?.period || ""} · {selectedClass?.time || ""}
+              {selectedClass.period} · {selectedClass.time} · {totalLearners} learners
             </span>
           </div>
-          <ChevronDown
-            size={18}
-            color="var(--color-slate-light)"
-            style={{
-              transform: showClassPicker ? "rotate(180deg)" : "none",
-              transition: "transform 0.2s",
-            }}
-          />
+          <ChevronDown size={18} color="var(--color-slate-light)"
+            style={{ transform: showClassPicker ? "rotate(180deg)" : "none", transition: "transform 0.2s" }} />
         </button>
 
         {showClassPicker && (
           <div style={styles.classPicker}>
-            {classes.map((cls) => (
+            {DEMO_CLASSES.map((cls) => (
               <button
                 key={cls.id}
-                onClick={() => {
-                  setSelectedClass(cls);
-                  setShowClassPicker(false);
-                  setShowFromDashboard(false);
-                }}
+                onClick={() => { setSelectedClass(cls); setShowClassPicker(false); }}
                 style={{
                   ...styles.classOption,
-                  background: cls.id === selectedClass?.id ? "var(--color-accent-light)" : "transparent",
-                  borderLeft: cls.id === selectedClass?.id ? "3px solid var(--color-accent)" : "3px solid transparent",
+                  background: cls.id === selectedClass.id ? "var(--color-accent-light)" : "transparent",
+                  borderLeft: cls.id === selectedClass.id ? "3px solid var(--color-accent)" : "3px solid transparent",
                 }}
               >
                 <div>
                   <span style={styles.classOptLabel}>{cls.subject} — {cls.name}</span>
-                  <span style={styles.classOptMeta}>{cls.period} · {cls.time}</span>
+                  <span style={styles.classOptMeta}>
+                    {cls.period} · {cls.time} · {(CLASS_ROSTERS[cls.id] || []).length} learners
+                  </span>
                 </div>
-                {cls.id === selectedClass?.id && <Check size={16} color="var(--color-accent)" />}
+                {cls.id === selectedClass.id && <Check size={16} color="var(--color-accent)" />}
               </button>
             ))}
           </div>
@@ -336,15 +239,15 @@ export default function AttendancePage() {
 
       {/* Stats bar */}
       <div style={styles.statsBar}>
-        <div style={styles.statPill}>
+        <div style={{ ...styles.statPill, background: "#D1FAE5" }}>
           <div style={{ ...styles.statDot, background: "var(--color-present)" }} />
           Present: <strong>{counts.present}</strong>
         </div>
-        <div style={styles.statPill}>
+        <div style={{ ...styles.statPill, background: "#FEE2E2" }}>
           <div style={{ ...styles.statDot, background: "var(--color-absent)" }} />
           Absent: <strong>{counts.absent}</strong>
         </div>
-        <div style={styles.statPill}>
+        <div style={{ ...styles.statPill, background: "#FEF3C7" }}>
           <div style={{ ...styles.statDot, background: "var(--color-late)" }} />
           Late: <strong>{counts.late}</strong>
         </div>
@@ -359,166 +262,146 @@ export default function AttendancePage() {
         <Search size={16} color="var(--color-slate-light)" style={{ position: "absolute", left: 12, top: 12 }} />
         <input
           type="text"
-          placeholder="Search learners..."
+          placeholder={`Search ${totalLearners} learners in ${selectedClass.name}…`}
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           style={styles.searchInput}
         />
+        {search && (
+          <button onClick={() => setSearch("")}
+            style={{ position: "absolute", right: 12, top: 10, background: "none", border: "none", cursor: "pointer", color: "#94A3B8" }}>
+            <X size={15} />
+          </button>
+        )}
       </div>
 
       {/* Learner List */}
       <div style={styles.listContainer}>
-        {loadingLearners ? (
-          <div style={{ padding: 48, textAlign: "center" }}>
-            <Loader2 size={24} color="var(--color-success)" style={{ animation: "spin 1s linear infinite" }} />
-            <p style={{ marginTop: 12, color: "var(--color-slate)" }}>Loading learners...</p>
-          </div>
-        ) : filteredLearners.length === 0 ? (
-          <div style={{ padding: 48, textAlign: "center", color: "var(--color-slate-light)" }}>
-            No learners found for this class
-          </div>
-        ) : filteredLearners.map(([id, rec], i) => (
+        {filteredLearners.length === 0 && (
+          <div style={{ padding: 40, textAlign: "center", color: "#94A3B8" }}>No learners match your search</div>
+        )}
+        {filteredLearners.map(([id, rec], i) => (
           <div
             key={id}
             style={{
               ...styles.learnerRow,
               background: i % 2 === 0 ? "var(--color-surface)" : "var(--color-surface-alt)",
-              animationDelay: `${i * 0.02}s`,
             }}
-            className="animate-in"
           >
-            <div style={styles.learnerNum}>{i + 1}</div>
+            <div style={styles.learnerNum}>{parseInt(id) + 1}</div>
             <div style={styles.learnerName}>{rec.name}</div>
 
             <div style={styles.statusBtns}>
               {[
-                { key: "present", label: "Present", icon: Check, color: "var(--color-present)", bg: "var(--color-present-bg)" },
-                { key: "absent", label: "Absent", icon: X, color: "var(--color-absent)", bg: "var(--color-absent-bg)" },
-                { key: "late", label: "Late", icon: Clock, color: "var(--color-late)", bg: "var(--color-late-bg)" },
-              ].map((s) => (
-                <button
-                  key={s.key}
-                  onClick={() => setStatus(id, s.key)}
-                  style={{
-                    ...styles.statusBtn,
-                    background: rec.status === s.key ? s.bg : "transparent",
-                    color: rec.status === s.key ? s.color : "var(--color-slate-light)",
-                    borderColor: rec.status === s.key ? s.color : "var(--color-border)",
-                    fontWeight: rec.status === s.key ? 600 : 400,
-                  }}
-                >
-                  <s.icon size={14} />
-                  {s.label}
-                </button>
-              ))}
+                { key: "present", label: "Present", icon: Check,  color: "var(--color-present)", bg: "var(--color-present-bg)" },
+                { key: "absent",  label: "Absent",  icon: X,     color: "var(--color-absent)",  bg: "var(--color-absent-bg)"  },
+                { key: "late",    label: "Late",    icon: Clock, color: "var(--color-late)",    bg: "var(--color-late-bg)"    },
+              ].map((s) => {
+                const Icon = s.icon;
+                return (
+                  <button
+                    key={s.key}
+                    onClick={() => setStatus(id, s.key)}
+                    style={{
+                      ...styles.statusBtn,
+                      background: rec.status === s.key ? s.bg : "transparent",
+                      color: rec.status === s.key ? s.color : "var(--color-slate-light)",
+                      borderColor: rec.status === s.key ? s.color : "var(--color-border)",
+                      fontWeight: rec.status === s.key ? 600 : 400,
+                    }}
+                  >
+                    <Icon size={13} />
+                    {s.label}
+                  </button>
+                );
+              })}
             </div>
 
+            {/* Reason input — only shown when absent */}
             {rec.status === "absent" && (
               <input
                 type="text"
-                placeholder="Reason for absence..."
+                placeholder="Reason (optional)"
                 value={rec.reason}
                 onChange={(e) => setReason(id, e.target.value)}
                 style={styles.reasonInput}
+                onClick={(e) => e.stopPropagation()}
               />
             )}
           </div>
         ))}
       </div>
 
-      {/* Save Button */}
-      <div style={styles.saveBar}>
-        {saved && (
-          <div style={styles.savedMsg}>
-            <Check size={16} />
-            Attendance saved for {selectedClass?.name || "class"}
-          </div>
-        )}
+      {/* Save footer */}
+      <div style={styles.saveFooter}>
+        <div style={styles.saveInfo}>
+          {totalLearners} learners · {counts.absent} absent · {counts.late} late
+        </div>
         <button
           onClick={handleSave}
-          disabled={saving || !selectedClass || loadingLearners}
+          disabled={saving || saved}
           style={{
             ...styles.saveBtn,
-            opacity: (saving || !selectedClass || loadingLearners) ? 0.7 : 1,
+            background: saved ? "#059669" : "var(--color-accent)",
+            opacity: saving ? 0.7 : 1,
+            cursor: saving ? "not-allowed" : "pointer",
           }}
         >
           {saving ? (
-            <Loader2 size={18} style={{ animation: "spin 1s linear infinite" }} />
+            <><Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> Saving…</>
+          ) : saved ? (
+            <><Check size={16} /> Saved</>
           ) : (
-            <Save size={18} />
+            <><Save size={16} /> Save Register</>
           )}
-          {saving ? "Saving..." : `Save Attendance — ${selectedClass?.name || ""}`}
         </button>
       </div>
 
       <style>{`
-        @keyframes spin { to { transform: rotate(360deg); } }
-        input:focus { outline: none; border-color: var(--color-accent) !important; box-shadow: var(--shadow-glow) !important; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
       `}</style>
     </div>
   );
 }
 
 const styles = {
-  page: { padding: "var(--space-xl)", maxWidth: 900, paddingBottom: 100 },
+  page: { padding: "var(--space-xl)", maxWidth: 900, margin: "0 auto" },
   backBtn: {
     display: "flex", alignItems: "center", gap: 6,
     padding: "8px 14px", marginBottom: "var(--space-md)",
     fontSize: 13, fontWeight: 500, fontFamily: "var(--font-body)",
     background: "transparent", color: "var(--color-slate)",
     border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
-    cursor: "pointer", transition: "all 0.15s",
+    cursor: "pointer", alignSelf: "flex-start",
   },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "var(--space-lg)" },
   headerLeft: { display: "flex", alignItems: "center", gap: "var(--space-md)" },
   headerIcon: { width: 48, height: 48, borderRadius: "var(--radius-md)", background: "var(--color-success-light)", display: "flex", alignItems: "center", justifyContent: "center" },
-  title: { fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 600, color: "var(--color-navy)", letterSpacing: "-0.02em" },
-  subtitle: { fontSize: 14, color: "var(--color-slate)" },
-  datePicker: { padding: "10px 14px", fontSize: 14, fontFamily: "var(--font-body)", border: "1.5px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-surface)", color: "var(--color-navy)", cursor: "pointer" },
-
-  preSelectedBanner: {
-    display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: "var(--space-md) var(--space-lg)",
-    background: "var(--color-accent-light)", border: "1px solid rgba(217,119,6,0.2)",
-    borderRadius: "var(--radius-md)", marginBottom: "var(--space-md)",
-  },
-  bannerContent: {},
-  bannerLabel: { fontSize: 11, fontWeight: 700, letterSpacing: "0.06em", color: "var(--color-accent-dark)", marginBottom: 2, textTransform: "uppercase" },
-  bannerTitle: { fontFamily: "var(--font-display)", fontSize: 17, fontWeight: 600, color: "var(--color-navy)" },
-  bannerMeta: { fontSize: 13, color: "var(--color-slate)" },
-  bannerDismiss: {
-    padding: "8px 14px", fontSize: 13, fontWeight: 500, fontFamily: "var(--font-body)",
-    background: "var(--color-surface)", color: "var(--color-slate)",
-    border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)",
-    cursor: "pointer",
-  },
-
+  title: { fontFamily: "var(--font-display)", fontSize: 24, fontWeight: 600, color: "var(--color-navy)", margin: 0 },
+  subtitle: { fontSize: 14, color: "var(--color-slate-light)", marginTop: 2 },
+  datePicker: { padding: "10px 14px", border: "1.5px solid var(--color-border)", borderRadius: "var(--radius-md)", fontFamily: "var(--font-body)", fontSize: 14, color: "var(--color-navy)", cursor: "pointer" },
   classSelectorWrap: { position: "relative", marginBottom: "var(--space-md)" },
-  classSelector: { width: "100%", padding: "14px 16px", background: "var(--color-surface)", border: "1.5px solid var(--color-border)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 15, textAlign: "left", transition: "border-color 0.2s" },
+  classSelector: { width: "100%", padding: "14px 16px", background: "var(--color-surface)", border: "1.5px solid var(--color-border)", borderRadius: "var(--radius-md)", display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 15, textAlign: "left" },
   classLabel: { fontWeight: 600, color: "var(--color-navy)", display: "block" },
   classMeta: { fontSize: 13, color: "var(--color-slate-light)" },
   classPicker: { position: "absolute", top: "100%", left: 0, right: 0, background: "var(--color-surface)", border: "1.5px solid var(--color-border)", borderRadius: "var(--radius-md)", marginTop: 4, zIndex: 50, boxShadow: "var(--shadow-lg)", overflow: "hidden" },
-  classOption: { width: "100%", padding: "12px 16px", border: "none", borderBottom: "1px solid var(--color-border-light)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 14, textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center", transition: "background 0.15s" },
+  classOption: { width: "100%", padding: "12px 16px", border: "none", borderBottom: "1px solid var(--color-border-light)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 14, textAlign: "left", display: "flex", justifyContent: "space-between", alignItems: "center" },
   classOptLabel: { fontWeight: 600, color: "var(--color-navy)", display: "block" },
-  classOptMeta: { fontSize: 12, color: "var(--color-slate-light)", display: "block" },
-
-  statsBar: { display: "flex", alignItems: "center", gap: "var(--space-md)", marginBottom: "var(--space-md)", padding: "var(--space-sm) 0" },
-  statPill: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--color-slate)" },
+  classOptMeta: { fontSize: 12, color: "var(--color-slate-light)" },
+  statsBar: { display: "flex", alignItems: "center", gap: "var(--space-md)", marginBottom: "var(--space-md)", flexWrap: "wrap" },
+  statPill: { display: "flex", alignItems: "center", gap: 6, padding: "8px 14px", borderRadius: "var(--radius-md)", fontSize: 14, fontFamily: "var(--font-body)" },
   statDot: { width: 8, height: 8, borderRadius: "50%" },
-  markAllBtn: { padding: "8px 14px", fontSize: 13, fontFamily: "var(--font-body)", fontWeight: 500, background: "var(--color-success-light)", color: "var(--color-success)", border: "1px solid rgba(5, 150, 105, 0.2)", borderRadius: "var(--radius-sm)", cursor: "pointer" },
-
+  markAllBtn: { padding: "8px 16px", background: "var(--color-surface)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-md)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, color: "var(--color-slate)", fontWeight: 500 },
   searchWrap: { position: "relative", marginBottom: "var(--space-md)" },
-  searchInput: { width: "100%", padding: "10px 14px 10px 36px", fontSize: 14, fontFamily: "var(--font-body)", border: "1.5px solid var(--color-border)", borderRadius: "var(--radius-md)", background: "var(--color-surface)", color: "var(--color-navy)" },
-
-  listContainer: { border: "1px solid var(--color-border-light)", borderRadius: "var(--radius-md)", overflow: "hidden" },
-  learnerRow: { display: "flex", alignItems: "center", gap: "var(--space-md)", padding: "10px 16px", flexWrap: "wrap", opacity: 0 },
-  learnerNum: { width: 28, fontSize: 12, color: "var(--color-slate-light)", textAlign: "center", fontVariantNumeric: "tabular-nums" },
-  learnerName: { flex: 1, fontSize: 14, fontWeight: 500, color: "var(--color-navy)", minWidth: 160 },
+  searchInput: { width: "100%", padding: "11px 14px 11px 38px", fontSize: 14, fontFamily: "var(--font-body)", border: "1.5px solid var(--color-border)", borderRadius: "var(--radius-md)", color: "var(--color-navy)", outline: "none", boxSizing: "border-box" },
+  listContainer: { background: "var(--color-surface)", border: "1px solid var(--color-border-light)", borderRadius: "var(--radius-lg)", overflow: "hidden", marginBottom: 80 },
+  learnerRow: { display: "flex", alignItems: "center", gap: "var(--space-md)", padding: "12px 16px", borderBottom: "1px solid var(--color-border-light)", flexWrap: "wrap" },
+  learnerNum: { fontSize: 12, color: "var(--color-slate-light)", width: 24, textAlign: "right", flexShrink: 0 },
+  learnerName: { flex: 1, fontWeight: 500, color: "var(--color-navy)", fontSize: 14, minWidth: 160 },
   statusBtns: { display: "flex", gap: 6 },
-  statusBtn: { display: "flex", alignItems: "center", gap: 4, padding: "6px 12px", fontSize: 13, fontFamily: "var(--font-body)", border: "1.5px solid var(--color-border)", borderRadius: "var(--radius-sm)", cursor: "pointer", background: "transparent", transition: "all 0.15s ease" },
-  reasonInput: { width: "100%", marginTop: 6, marginLeft: 44, padding: "8px 12px", fontSize: 13, fontFamily: "var(--font-body)", border: "1px solid var(--color-border)", borderRadius: "var(--radius-sm)", background: "var(--color-surface)", color: "var(--color-navy)" },
-
-  saveBar: { position: "fixed", bottom: 0, left: 240, right: 0, padding: "var(--space-md) var(--space-xl)", background: "var(--color-surface)", borderTop: "1px solid var(--color-border-light)", display: "flex", justifyContent: "flex-end", alignItems: "center", gap: "var(--space-md)", zIndex: 50 },
-  savedMsg: { display: "flex", alignItems: "center", gap: 6, fontSize: 14, color: "var(--color-success)", fontWeight: 500 },
-  saveBtn: { display: "flex", alignItems: "center", gap: 8, padding: "12px 24px", fontSize: 15, fontWeight: 600, fontFamily: "var(--font-body)", background: "var(--color-accent)", color: "#FFFFFF", border: "none", borderRadius: "var(--radius-md)", cursor: "pointer", transition: "all 0.2s ease" },
+  statusBtn: { display: "flex", alignItems: "center", gap: 5, padding: "6px 12px", border: "1.5px solid", borderRadius: "var(--radius-md)", cursor: "pointer", fontFamily: "var(--font-body)", fontSize: 13, transition: "all 0.12s" },
+  reasonInput: { flex: 1, padding: "6px 10px", border: "1px solid #FECACA", borderRadius: "var(--radius-sm)", fontSize: 13, fontFamily: "var(--font-body)", color: "#991B1B", background: "#FFF5F5", outline: "none", minWidth: 180 },
+  saveFooter: { position: "fixed", bottom: 0, left: 240, right: 0, padding: "16px 32px", background: "var(--color-surface)", borderTop: "1px solid var(--color-border-light)", display: "flex", justifyContent: "space-between", alignItems: "center", zIndex: 100 },
+  saveInfo: { fontSize: 14, color: "var(--color-slate)", fontFamily: "var(--font-body)" },
+  saveBtn: { display: "flex", alignItems: "center", gap: 8, padding: "12px 28px", border: "none", borderRadius: "var(--radius-md)", color: "#FFF", fontFamily: "var(--font-body)", fontSize: 15, fontWeight: 600, transition: "all 0.2s" },
 };
