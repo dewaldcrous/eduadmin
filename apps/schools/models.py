@@ -145,12 +145,24 @@ class Timetable(models.Model):
 
 
 class TimetableSlot(models.Model):
+    # Support both week-based (MON-FRI) and cycle-based (D1-D8) scheduling
     DAYS = [
         ("MON", "Monday"),
         ("TUE", "Tuesday"),
         ("WED", "Wednesday"),
         ("THU", "Thursday"),
         ("FRI", "Friday"),
+        ("SAT", "Saturday"),
+        ("SUN", "Sunday"),
+        # Cycle days for schools that don't follow a standard week
+        ("D1", "Day 1"),
+        ("D2", "Day 2"),
+        ("D3", "Day 3"),
+        ("D4", "Day 4"),
+        ("D5", "Day 5"),
+        ("D6", "Day 6"),
+        ("D7", "Day 7"),
+        ("D8", "Day 8"),
     ]
 
     timetable = models.ForeignKey(
@@ -164,6 +176,7 @@ class TimetableSlot(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
+        blank=True,
         related_name="slots",
     )
     classroom = models.ForeignKey(Classroom, on_delete=models.CASCADE)
@@ -172,10 +185,28 @@ class TimetableSlot(models.Model):
     is_break = models.BooleanField(default=False)
 
     class Meta:
-        unique_together = ["timetable", "day", "period", "teacher"]
+        unique_together = ["timetable", "day", "period", "classroom"]
 
     def __str__(self):
         return f"{self.day} P{self.period}: {self.subject} - {self.classroom}"
+
+
+class TimetableConfig(models.Model):
+    """Configuration for a timetable (cycle type, periods, etc.)"""
+    CYCLE_TYPES = [
+        ("week", "Weekly (Mon-Fri)"),
+        ("cycle", "Cycle Days (Day 1-N)"),
+    ]
+
+    timetable = models.OneToOneField(
+        Timetable, on_delete=models.CASCADE, related_name="config"
+    )
+    cycle_type = models.CharField(max_length=10, choices=CYCLE_TYPES, default="week")
+    num_days = models.PositiveIntegerField(default=5)  # 5 for week, 6-8 for cycles
+    periods_per_day = models.PositiveIntegerField(default=7)
+
+    def __str__(self):
+        return f"Config for {self.timetable}"
 
 
 class TeacherAvailability(models.Model):

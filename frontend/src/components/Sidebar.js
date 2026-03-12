@@ -4,7 +4,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   BookOpen, LayoutDashboard, ClipboardCheck, BookCopy,
   Users, BarChart3, AlertTriangle, Calendar, Clock,
-  Settings, LogOut, User,
+  Settings, LogOut, User, Building2,
 } from "lucide-react";
 
 const NAV_ITEMS = [
@@ -13,10 +13,11 @@ const NAV_ITEMS = [
   { to: "/planning", icon: BookCopy, label: "Lesson Plans" },
   { to: "/learners", icon: Users, label: "Learners" },
   { to: "/timetable", icon: Clock, label: "Timetable" },
+  { to: "/school", icon: Building2, label: "School Setup" },
   { to: "/behaviour", icon: AlertTriangle, label: "Behaviour" },
   { to: "/assessments", icon: BarChart3, label: "Assessments" },
   { to: "/calendar", icon: Calendar, label: "Calendar" },
-  { to: "/users", icon: Settings, label: "User Management" },
+  { to: "/users", icon: Settings, label: "Staff Management" },
 ];
 
 export default function Sidebar() {
