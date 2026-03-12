@@ -82,7 +82,7 @@ class WeeklyPlanView(APIView):
         if str(teacher_id) != str(user.id) and user.role == "teacher":
             teacher_id = user.id
 
-        from apps.schools.models import TimetableSlot, Timetable
+        from apps.schools.models import TimetableSlot, Timetable, TimetableConfig
 
         timetable = Timetable.objects.filter(
             school=user.school, status="active"
@@ -90,6 +90,31 @@ class WeeklyPlanView(APIView):
 
         if not timetable:
             return Response({"error": "No active timetable found"}, status=404)
+
+        # Get timetable configuration for dynamic days/periods
+        try:
+            config = timetable.config
+            cycle_type = config.cycle_type
+            num_days = config.num_days
+            periods_per_day = config.periods_per_day
+        except TimetableConfig.DoesNotExist:
+            # Default to weekly schedule
+            cycle_type = "week"
+            num_days = 5
+            periods_per_day = 7
+
+        # Build dynamic days list based on cycle type
+        if cycle_type == "cycle":
+            days = [f"D{i}" for i in range(1, num_days + 1)]
+            day_labels = {f"D{i}": f"Day {i}" for i in range(1, num_days + 1)}
+        else:
+            week_days = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+            week_labels = {
+                "MON": "Monday", "TUE": "Tuesday", "WED": "Wednesday",
+                "THU": "Thursday", "FRI": "Friday", "SAT": "Saturday", "SUN": "Sunday",
+            }
+            days = week_days[:num_days]
+            day_labels = {d: week_labels[d] for d in days}
 
         slots = TimetableSlot.objects.filter(
             timetable=timetable, teacher_id=teacher_id
@@ -108,16 +133,26 @@ class WeeklyPlanView(APIView):
             if key not in plan_map or plan.version > plan_map[key].version:
                 plan_map[key] = plan
 
-        days = ["MON", "TUE", "WED", "THU", "FRI"]
-        day_labels = {
-            "MON": "Monday", "TUE": "Tuesday", "WED": "Wednesday",
-            "THU": "Thursday", "FRI": "Friday",
-        }
+        # Build periods list from actual slot data or defaults
+        all_periods = set()
+        period_times = {}
+        for slot in slots:
+            all_periods.add(slot.period)
+            period_times[slot.period] = {
+                "start": slot.start_time.strftime("%H:%M"),
+                "end": slot.end_time.strftime("%H:%M"),
+            }
+
+        # If no slots, use default periods
+        if not all_periods:
+            all_periods = set(range(1, periods_per_day + 1))
+
+        periods_list = sorted(all_periods)
 
         weekly = []
         for day in days:
             day_slots = slots.filter(day=day).order_by("period")
-            day_data = {"day": day, "label": day_labels[day], "periods": []}
+            day_data = {"day": day, "label": day_labels.get(day, day), "periods": []}
             for slot in day_slots:
                 key = f"{day}-{slot.period}"
                 plan = plan_map.get(key)
@@ -159,6 +194,13 @@ class WeeklyPlanView(APIView):
             "timetable_id": timetable.id,
             "term": timetable.term,
             "year": timetable.year,
+            "config": {
+                "cycle_type": cycle_type,
+                "num_days": num_days,
+                "periods_per_day": periods_per_day,
+                "days": [{"key": d, "label": day_labels.get(d, d)} for d in days],
+                "periods": [{"period": p, **period_times.get(p, {"start": "", "end": ""})} for p in periods_list],
+            },
             "weekly": weekly,
             "stats": {
                 "total_slots": total_slots,

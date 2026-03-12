@@ -13,7 +13,8 @@ import {
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
 
-const DAYS = [
+// Default fallbacks (used if API doesn't return config)
+const DEFAULT_DAYS = [
   { key: "MON", label: "Monday" },
   { key: "TUE", label: "Tuesday" },
   { key: "WED", label: "Wednesday" },
@@ -21,14 +22,14 @@ const DAYS = [
   { key: "FRI", label: "Friday" },
 ];
 
-const PT = [
-  { p: 1, s: "07:45", e: "08:30" },
-  { p: 2, s: "08:30", e: "09:15" },
-  { p: 3, s: "09:15", e: "10:00" },
-  { p: 4, s: "10:20", e: "11:05" },
-  { p: 5, s: "11:05", e: "11:50" },
-  { p: 6, s: "11:50", e: "12:35" },
-  { p: 7, s: "13:00", e: "13:45" },
+const DEFAULT_PERIODS = [
+  { period: 1, start: "07:45", end: "08:30" },
+  { period: 2, start: "08:30", end: "09:15" },
+  { period: 3, start: "09:15", end: "10:00" },
+  { period: 4, start: "10:20", end: "11:05" },
+  { period: 5, start: "11:05", end: "11:50" },
+  { period: 6, start: "11:50", end: "12:35" },
+  { period: 7, start: "13:00", end: "13:45" },
 ];
 
 const COLORS = [
@@ -97,6 +98,7 @@ export default function WeeklyPlannerPage() {
   const [wOff, setWOff] = useState(0);
   const [weeklyData, setWeeklyData] = useState(null);
   const [stats, setStats] = useState({ total_slots: 0, plans_created: 0, plans_approved: 0, plans_missing: 0 });
+  const [timetableConfig, setTimetableConfig] = useState(null);
 
   const [sp, setSp] = useState(null); // detail side panel
   const [showCr, setShowCr] = useState(false); // create/edit modal
@@ -111,14 +113,19 @@ export default function WeeklyPlannerPage() {
   const [loadingAtts, setLoadingAtts] = useState(false);
 
   // ── Computed ──
+  // Use dynamic days/periods from config, fallback to defaults
+  const DAYS = timetableConfig?.days || DEFAULT_DAYS;
+  const PERIODS = timetableConfig?.periods || DEFAULT_PERIODS;
+  const isCycleSchedule = timetableConfig?.cycle_type === "cycle";
+
   const cMon = new Date(mon0);
   cMon.setDate(cMon.getDate() + wOff * 7);
   const cFri = new Date(cMon);
-  cFri.setDate(cFri.getDate() + 4);
+  cFri.setDate(cFri.getDate() + (DAYS.length - 1));
   const wn = gWN(cMon);
   const isCur = wOff === 0;
   const wDts = [];
-  for (let wi = 0; wi < 5; wi++) {
+  for (let wi = 0; wi < DAYS.length; wi++) {
     const wd2 = new Date(cMon);
     wd2.setDate(wd2.getDate() + wi);
     wDts.push(wd2);
@@ -136,6 +143,8 @@ export default function WeeklyPlannerPage() {
       const res = await getWeeklyPlan();
       setWeeklyData(res.data.weekly || []);
       setStats(res.data.stats || { total_slots: 0, plans_created: 0, plans_approved: 0, plans_missing: 0 });
+      // Store timetable config for dynamic days/periods
+      setTimetableConfig(res.data.config || null);
     } catch (err) {
       console.error("Failed to load weekly plan:", err);
       setError("Failed to load lesson plans. Please try again.");
@@ -435,30 +444,32 @@ export default function WeeklyPlannerPage() {
 
       {/* ── TIMETABLE GRID ── */}
       <div style={{ overflowX: "auto", marginBottom: 12 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "80px repeat(5, 1fr)", gap: 2, minWidth: 900 }}>
+        <div style={{ display: "grid", gridTemplateColumns: `80px repeat(${DAYS.length}, 1fr)`, gap: 2, minWidth: Math.max(900, 80 + DAYS.length * 160) }}>
           {/* Column headers */}
           <div style={{ padding: 10, fontSize: 11, fontWeight: 600, color: "var(--color-slate-light)", textTransform: "uppercase" }}>Period</div>
           {DAYS.map((day, idx) => {
-            const isToday = isCur && wDts[idx].toDateString() === today.toDateString();
+            const isToday = !isCycleSchedule && isCur && wDts[idx]?.toDateString() === today.toDateString();
             return (
               <div key={day.key} style={{ padding: "10px 8px", background: isToday ? "#FEF3C7" : "#FFF", borderRadius: "8px 8px 0 0", textAlign: "center", border: "1px solid " + (isToday ? "#D97706" : "var(--color-border-light)") }}>
                 <div style={{ fontSize: 13, fontWeight: 700 }}>{day.label}</div>
-                <div style={{ fontSize: 11, color: isToday ? "#D97706" : "var(--color-slate-light)", marginTop: 2, fontWeight: isToday ? 700 : 400 }}>{fDt(wDts[idx])}</div>
+                {!isCycleSchedule && wDts[idx] && (
+                  <div style={{ fontSize: 11, color: isToday ? "#D97706" : "var(--color-slate-light)", marginTop: 2, fontWeight: isToday ? 700 : 400 }}>{fDt(wDts[idx])}</div>
+                )}
               </div>
             );
           })}
 
           {/* Period rows */}
-          {PT.map((pt) => (
-            <React.Fragment key={pt.p}>
+          {PERIODS.map((pt) => (
+            <React.Fragment key={pt.period}>
               <div style={{ padding: "10px 6px", textAlign: "center" }}>
-                <div style={{ fontWeight: 700, fontSize: 13 }}>P{pt.p}</div>
-                <div style={{ fontSize: 9, color: "var(--color-slate-light)", marginTop: 2 }}>{pt.s}–{pt.e}</div>
+                <div style={{ fontWeight: 700, fontSize: 13 }}>P{pt.period}</div>
+                {pt.start && pt.end && <div style={{ fontSize: 9, color: "var(--color-slate-light)", marginTop: 2 }}>{pt.start}–{pt.end}</div>}
               </div>
 
               {DAYS.map((day) => {
                 const daySlots = getDaySlots(day.key);
-                const sl = daySlots.find((s) => s.period === pt.p);
+                const sl = daySlots.find((s) => s.period === pt.period);
 
                 if (!sl) return (
                   <div key={day.key} style={{ background: "var(--color-surface-alt)", border: "1px solid var(--color-border-light)", borderRadius: 6, padding: 8, minHeight: 100, display: "flex", alignItems: "center", justifyContent: "center" }}>
