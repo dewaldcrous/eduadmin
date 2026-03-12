@@ -222,7 +222,7 @@ function EnrollModal({ learner, classrooms, onClose, onSave }) {
 
   if (!learner) return null;
 
-  const currentClass = learner.classroom;
+  const currentClass = typeof learner.classroom === "object" ? learner.classroom?.name : learner.classroom;
 
   async function handleSave() {
     setSaving(true);
@@ -344,9 +344,13 @@ export default function LearnersPage() {
         getClassrooms(),
         getGrades(),
       ]);
-      setLearners(learnersRes.data || []);
-      setClassrooms(classroomsRes.data || []);
-      setGrades(gradesRes.data || []);
+      // Handle paginated response (results array) or plain array
+      const learnersData = learnersRes.data?.results || learnersRes.data || [];
+      const classroomsData = classroomsRes.data?.results || classroomsRes.data || [];
+      const gradesData = gradesRes.data?.results || gradesRes.data || [];
+      setLearners(Array.isArray(learnersData) ? learnersData : []);
+      setClassrooms(Array.isArray(classroomsData) ? classroomsData : []);
+      setGrades(Array.isArray(gradesData) ? gradesData : []);
     } catch (err) {
       console.error("Failed to load data:", err);
     } finally {
@@ -355,8 +359,10 @@ export default function LearnersPage() {
   }
 
   const filtered = learners.filter((l) => {
-    if (selClass !== "all" && l.classroom !== selClass) return false;
-    if (selGrade !== "all" && l.grade !== selGrade) return false;
+    const classroomName = typeof l.classroom === "object" ? l.classroom?.name : l.classroom;
+    const gradeName = typeof l.grade === "object" ? l.grade?.name : l.grade;
+    if (selClass !== "all" && classroomName !== selClass) return false;
+    if (selGrade !== "all" && gradeName !== selGrade) return false;
     if (search) {
       const q = search.toLowerCase();
       if (!`${l.first_name} ${l.last_name}`.toLowerCase().includes(q)) return false;
@@ -505,6 +511,8 @@ export default function LearnersPage() {
               {filtered.map((l, i) => {
                 const ac = attColor(l.attendance_rate);
                 const rb = riskBadge(l.risk_level);
+                const classroomName = typeof l.classroom === "object" ? l.classroom?.name : l.classroom;
+                const gradeName = typeof l.grade === "object" ? l.grade?.name : l.grade;
                 return (
                   <tr key={l.id}
                     style={{ borderBottom: "1px solid #F1F5F9", cursor: "pointer" }}
@@ -524,9 +532,9 @@ export default function LearnersPage() {
                       </div>
                     </td>
                     <td style={{ padding: "13px 14px", textAlign: "center" }}>
-                      <span style={{ padding: "3px 10px", background: "#F1F5F9", borderRadius: 99, fontSize: 12, fontWeight: 700, color: "var(--color-navy)" }}>{l.classroom || "-"}</span>
+                      <span style={{ padding: "3px 10px", background: "#F1F5F9", borderRadius: 99, fontSize: 12, fontWeight: 700, color: "var(--color-navy)" }}>{classroomName || "-"}</span>
                     </td>
-                    <td style={{ padding: "13px 14px", textAlign: "center", color: "#64748B", fontSize: 13 }}>{l.grade || "-"}</td>
+                    <td style={{ padding: "13px 14px", textAlign: "center", color: "#64748B", fontSize: 13 }}>{gradeName || "-"}</td>
                     <td style={{ padding: "13px 14px", textAlign: "center", color: "#64748B", fontSize: 13 }}>{l.home_language || "-"}</td>
                     <td style={{ padding: "13px 14px", textAlign: "center" }}>
                       <span style={{ padding: "4px 12px", borderRadius: 99, fontSize: 13, fontWeight: 600, background: ac.bg, color: ac.c }}>{l.attendance_rate != null ? l.attendance_rate + "%" : "-"}</span>
@@ -564,6 +572,8 @@ export default function LearnersPage() {
           {filtered.map((l) => {
             const ac = attColor(l.attendance_rate);
             const rb = riskBadge(l.risk_level);
+            const classroomName = typeof l.classroom === "object" ? l.classroom?.name : l.classroom;
+            const gradeName = typeof l.grade === "object" ? l.grade?.name : l.grade;
             return (
               <div key={l.id} onClick={() => setSelLearner(l)}
                 style={{ background: "#FFF", border: "1px solid #E2E8F0", borderRadius: 12, padding: 16, cursor: "pointer", transition: "box-shadow 0.2s" }}
@@ -575,7 +585,7 @@ export default function LearnersPage() {
                   </div>
                   <div>
                     <div style={{ fontWeight: 600, color: "var(--color-navy)" }}>{l.first_name} {l.last_name}</div>
-                    <div style={{ fontSize: 12, color: "#94A3B8" }}>{l.classroom || "No class"} - {l.grade || "-"}</div>
+                    <div style={{ fontSize: 12, color: "#94A3B8" }}>{classroomName || "No class"} - {gradeName || "-"}</div>
                   </div>
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
@@ -618,7 +628,10 @@ export default function LearnersPage() {
       )}
 
       {/* Detail Panel */}
-      {selLearner && (
+      {selLearner && (() => {
+        const selClassroomName = typeof selLearner.classroom === "object" ? selLearner.classroom?.name : selLearner.classroom;
+        const selGradeName = typeof selLearner.grade === "object" ? selLearner.grade?.name : selLearner.grade;
+        return (
         <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", zIndex: 200, display: "flex", justifyContent: "flex-end", animation: "fadeIn 0.2s" }}
           onClick={() => setSelLearner(null)}>
           <div style={{ width: 500, height: "100%", background: "#FFF", overflowY: "auto", animation: "slideIn 0.25s ease-out", boxShadow: "0 12px 32px rgba(0,0,0,0.1)" }}
@@ -631,7 +644,7 @@ export default function LearnersPage() {
                   </div>
                   <div>
                     <h2 style={{ fontFamily: "var(--font-display)", fontSize: 22, fontWeight: 600, color: "var(--color-navy)" }}>{selLearner.first_name} {selLearner.last_name}</h2>
-                    <div style={{ fontSize: 14, color: "var(--color-slate)" }}>{selLearner.classroom || "No class"} - {selLearner.grade || "-"}</div>
+                    <div style={{ fontSize: 14, color: "var(--color-slate)" }}>{selClassroomName || "No class"} - {selGradeName || "-"}</div>
                   </div>
                 </div>
                 <button onClick={() => setSelLearner(null)} style={{ background: "none", border: "none", color: "var(--color-slate)", cursor: "pointer" }}><X size={20} /></button>
@@ -655,8 +668,8 @@ export default function LearnersPage() {
               <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
                 {[
                   { lb: "Full Name", val: `${selLearner.first_name} ${selLearner.last_name}` },
-                  { lb: "Class", val: selLearner.classroom || "Not enrolled" },
-                  { lb: "Grade", val: selLearner.grade || "-" },
+                  { lb: "Class", val: selClassroomName || "Not enrolled" },
+                  { lb: "Grade", val: selGradeName || "-" },
                   { lb: "Home Language", val: selLearner.home_language || "-" },
                   { lb: "Special Needs", val: selLearner.special_needs || "None recorded" },
                 ].map((f, i) => (
@@ -678,7 +691,8 @@ export default function LearnersPage() {
             </div>
           </div>
         </div>
-      )}
+        );
+      })()}
 
       <style>{`
         @keyframes fadeIn { from { opacity: 0 } to { opacity: 1 } }

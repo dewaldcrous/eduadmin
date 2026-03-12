@@ -3,7 +3,7 @@ import { useAuth } from "../context/AuthContext";
 import {
   getWeeklyPlan, createPlan, updatePlan, deletePlan,
   submitPlan, deliverLesson, importPlans, exportPlansUrl,
-  uploadAttachments, deleteAttachment,
+  uploadAttachments, getAttachments, deleteAttachment,
 } from "../api/client";
 import {
   BookCopy, Plus, Check, Clock, X, Send, Edit3, AlertCircle,
@@ -107,6 +107,8 @@ export default function WeeklyPlannerPage() {
   const [fm, setFm] = useState({ t: "", obj: "", act: "", dif: "", res: "" });
   const [saveErr, setSaveErr] = useState("");
   const [pnd, setPnd] = useState([]); // pending new file attachments
+  const [existingAtts, setExistingAtts] = useState([]); // existing attachments for the selected plan
+  const [loadingAtts, setLoadingAtts] = useState(false);
 
   // ── Computed ──
   const cMon = new Date(mon0);
@@ -154,6 +156,7 @@ export default function WeeklyPlannerPage() {
     setTgt({ slot_id: slot.slot_id, day: dayKey, subject: slot.subject, classroom: slot.classroom, period: slot.period });
     setFm({ t: "", obj: "", act: "", dif: "", res: "" });
     setPnd([]);
+    setExistingAtts([]); // Clear existing attachments for new plan
     setSaveErr("");
     setIsEd(false);
     setShowCr(true);
@@ -174,6 +177,7 @@ export default function WeeklyPlannerPage() {
     setIsEd(true);
     setShowCr(true);
     setSp(null);
+    loadAttachments(plan.id); // Load existing attachments for editing
   }
 
   // ── Save plan ──
@@ -275,6 +279,39 @@ export default function WeeklyPlannerPage() {
   }
   function rmPending(idx) {
     setPnd((p) => p.filter((_, j) => j !== idx));
+  }
+
+  // ── Load attachments for a plan ──
+  async function loadAttachments(planId) {
+    if (!planId) return;
+    setLoadingAtts(true);
+    try {
+      const res = await getAttachments(planId);
+      setExistingAtts(res.data || []);
+    } catch (err) {
+      console.error("Failed to load attachments:", err);
+      setExistingAtts([]);
+    } finally {
+      setLoadingAtts(false);
+    }
+  }
+
+  // ── Delete an existing attachment ──
+  async function handleDeleteAttachment(attId) {
+    if (!window.confirm("Delete this attachment?")) return;
+    try {
+      await deleteAttachment(attId);
+      setExistingAtts((prev) => prev.filter((a) => a.id !== attId));
+    } catch (err) {
+      console.error("Failed to delete attachment:", err);
+      alert(err.response?.data?.error || "Failed to delete attachment");
+    }
+  }
+
+  // ── Open detail panel and load attachments ──
+  function openDetailPanel(plan, slot, dayKey) {
+    setSp({ ...plan, slot, day: dayKey });
+    loadAttachments(plan.id);
   }
 
   // ── Import ──
@@ -447,7 +484,7 @@ export default function WeeklyPlannerPage() {
                       borderLeft: "5px solid " + clsColor.v,
                       position: "relative",
                     }}
-                    onClick={() => pl ? setSp({ ...pl, slot: sl, day: day.key }) : openC(day.key, sl)}>
+                    onClick={() => pl ? openDetailPanel(pl, sl, day.key) : openC(day.key, sl)}>
 
                     {/* Class label + subject tag */}
                     <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
@@ -535,6 +572,45 @@ export default function WeeklyPlannerPage() {
                 <div style={{ fontSize: 14, color: "var(--color-navy)", lineHeight: 1.7 }}>{f.val}</div>
               </div>
             ))}
+
+            {/* Attachments Section */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--color-slate-light)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 8, display: "flex", alignItems: "center", gap: 6 }}>
+                <Paperclip size={12} /> Attachments
+                {existingAtts.length > 0 && <span style={{ background: "#D97706", color: "#FFF", padding: "1px 6px", borderRadius: 99, fontSize: 10 }}>{existingAtts.length}</span>}
+              </div>
+              {loadingAtts ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, color: "var(--color-slate-light)", fontSize: 13 }}>
+                  <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> Loading attachments...
+                </div>
+              ) : existingAtts.length > 0 ? (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  {existingAtts.map((att) => (
+                    <div key={att.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", background: "var(--color-surface-alt)", borderRadius: 8, border: "1px solid var(--color-border-light)" }}>
+                      <File size={18} color="#2563EB" />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <a href={att.file_url || att.file} target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 13, fontWeight: 600, color: "#2563EB", textDecoration: "none", display: "block", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                          {att.original_filename || att.filename || "Attachment"}
+                        </a>
+                        <div style={{ fontSize: 11, color: "var(--color-slate-light)", marginTop: 2 }}>
+                          {att.file_size ? fSz(att.file_size) : ""} {att.uploaded_at ? `· ${new Date(att.uploaded_at).toLocaleDateString()}` : ""}
+                        </div>
+                      </div>
+                      <button onClick={() => handleDeleteAttachment(att.id)}
+                        style={{ padding: 6, background: "#FEE2E2", border: "none", borderRadius: 6, cursor: "pointer", color: "#DC2626", display: "flex", alignItems: "center", justifyContent: "center" }}
+                        title="Delete attachment">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ padding: "12px 16px", background: "var(--color-surface-alt)", borderRadius: 8, border: "1px dashed var(--color-border)", textAlign: "center", color: "var(--color-slate-light)", fontSize: 13 }}>
+                  No attachments
+                </div>
+              )}
+            </div>
 
             {/* Panel actions */}
             <div style={{ display: "flex", gap: 8, paddingTop: 24, borderTop: "1px solid var(--color-border-light)", flexWrap: "wrap" }}>
@@ -638,6 +714,25 @@ export default function WeeklyPlannerPage() {
                   <Paperclip size={14} /> Attach files
                 </button>
 
+                {/* Existing attachments (when editing) */}
+                {isEd && existingAtts.length > 0 && (
+                  <div style={{ marginTop: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-slate-light)", marginBottom: 6 }}>EXISTING FILES</div>
+                    {existingAtts.map((att) => (
+                      <div key={att.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", background: "#DBEAFE", borderRadius: 6, border: "1px solid #93C5FD", marginBottom: 4 }}>
+                        <File size={14} color="#2563EB" />
+                        <a href={att.file_url || att.file} target="_blank" rel="noopener noreferrer"
+                          style={{ flex: 1, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", color: "#2563EB", textDecoration: "none" }}>
+                          {att.original_filename || att.filename || "Attachment"}
+                        </a>
+                        <span style={{ fontSize: 11, color: "#64748B" }}>{att.file_size ? fSz(att.file_size) : ""}</span>
+                        <button onClick={() => handleDeleteAttachment(att.id)} style={{ background: "none", border: "none", color: "#DC2626", cursor: "pointer", padding: 4 }}><Trash2 size={14} /></button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* New files to upload */}
                 {pnd.length > 0 && (
                   <div style={{ marginTop: 10 }}>
                     <div style={{ fontSize: 11, fontWeight: 600, color: "var(--color-slate-light)", marginBottom: 6 }}>NEW FILES</div>
