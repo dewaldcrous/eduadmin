@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework import generics, status
 from apps.accounts.permissions import IsTeacherOrAbove, IsHODOrAbove
 from apps.accounts.models import User
-from .models import TimetableSlot, Timetable, Classroom, Grade, Subject
+from .models import TimetableSlot, Timetable, TimetableConfig, Classroom, Grade, Subject
 
 
 # ─── TIMETABLE MANAGEMENT ───────────────────────────────────────────────────
@@ -653,34 +653,43 @@ class TimetableConfigView(APIView):
         except Timetable.DoesNotExist:
             return Response({"error": "Timetable not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Get unique days and periods from slots
-        slots = TimetableSlot.objects.filter(timetable=timetable)
-        days = sorted(set(slots.values_list("day", flat=True)))
-        max_period = slots.order_by("-period").values_list("period", flat=True).first() or 7
+        # Try to get config from TimetableConfig model
+        try:
+            config = timetable.config
+            cycle_type = config.cycle_type
+            days_count = config.num_days
+            periods_per_day = config.periods_per_day
+        except TimetableConfig.DoesNotExist:
+            # Default values if no config exists
+            cycle_type = "week"
+            days_count = 5
+            periods_per_day = 7
 
-        # Get period times
-        period_times = []
-        for p in range(1, max_period + 1):
+        # Get period times from existing slots or use defaults
+        slots = TimetableSlot.objects.filter(timetable=timetable)
+        periods = []
+        for p in range(1, periods_per_day + 1):
             slot = slots.filter(period=p).first()
             if slot:
-                period_times.append({
+                periods.append({
                     "period": p,
                     "start_time": slot.start_time.strftime("%H:%M"),
                     "end_time": slot.end_time.strftime("%H:%M"),
                 })
             else:
-                period_times.append({
+                # Default period times
+                start_hour = 7 + (p - 1)
+                periods.append({
                     "period": p,
-                    "start_time": f"{6+p}:45",
-                    "end_time": f"{7+p}:30",
+                    "start_time": f"{start_hour:02d}:45",
+                    "end_time": f"{start_hour + 1:02d}:30",
                 })
 
         return Response({
             "id": timetable.id,
-            "cycle_days": days if days else ["MON", "TUE", "WED", "THU", "FRI"],
-            "periods_per_day": max_period,
-            "period_times": period_times,
-            "use_cycle_days": any(d.startswith("D") for d in days),
+            "cycle_type": cycle_type,
+            "days_count": days_count,
+            "periods": periods,
         })
 
     def put(self, request, pk):
@@ -692,11 +701,23 @@ class TimetableConfigView(APIView):
         except Timetable.DoesNotExist:
             return Response({"error": "Timetable not found"}, status=status.HTTP_404_NOT_FOUND)
 
-        # Update period times for existing slots
-        period_times = request.data.get("period_times", [])
-        from datetime import datetime
+        cycle_type = request.data.get("cycle_type", "week")
+        days_count = request.data.get("days_count", 5)
+        periods = request.data.get("periods", [])
 
-        for pt in period_times:
+        # Create or update TimetableConfig
+        config, created = TimetableConfig.objects.update_or_create(
+            timetable=timetable,
+            defaults={
+                "cycle_type": cycle_type,
+                "num_days": days_count,
+                "periods_per_day": len(periods) if periods else 7,
+            }
+        )
+
+        # Update period times for existing slots
+        from datetime import datetime
+        for pt in periods:
             period = pt.get("period")
             start_time = pt.get("start_time")
             end_time = pt.get("end_time")
@@ -709,4 +730,9 @@ class TimetableConfigView(APIView):
                     end_time=datetime.strptime(end_time, "%H:%M").time(),
                 )
 
-        return Response({"updated": True})
+        return Response({
+            "id": timetable.id,
+            "cycle_type": config.cycle_type,
+            "days_count": config.num_days,
+            "periods": periods,
+        })

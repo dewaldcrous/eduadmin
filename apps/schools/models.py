@@ -136,10 +136,10 @@ class Timetable(models.Model):
         return f"{self.school.name} - Term {self.term}/{self.year} ({self.status})"
 
     def activate(self):
-        """Set to active, archive any previous active timetable."""
+        """Set to active, archive all other active timetables for this school."""
         Timetable.objects.filter(
-            school=self.school, term=self.term, year=self.year, status="active"
-        ).update(status="archived")
+            school=self.school, status="active"
+        ).exclude(id=self.id).update(status="archived")
         self.status = "active"
         self.save()
 

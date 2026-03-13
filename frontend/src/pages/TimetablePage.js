@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
-  getTimetables, getTimetableDetail, createTimetable, updateTimetableStatus,
+  getTimetables, getTimetableDetail, createTimetable, deleteTimetable, updateTimetableStatus,
   createTimetableSlot, updateTimetableSlot, deleteTimetableSlot,
   getTeachers, getClassrooms, getSubjects,
   getTimetableConfig, updateTimetableConfig,
@@ -633,6 +633,27 @@ export default function TimetablePage() {
     }
   }
 
+  // ── Delete timetable ──
+  async function handleDeleteTimetable() {
+    if (!window.confirm("Delete this timetable and all its slots? This cannot be undone.")) return;
+    try {
+      await deleteTimetable(selTimetableId);
+      setTimetables((prev) => prev.filter((tt) => tt.id !== selTimetableId));
+      setTimetableDetail(null);
+      setTimetableConfig(null);
+      // Select another timetable if available
+      const remaining = timetables.filter((tt) => tt.id !== selTimetableId);
+      if (remaining.length > 0) {
+        setSelTimetableId(remaining[0].id);
+      } else {
+        setSelTimetableId(null);
+      }
+    } catch (err) {
+      console.error("Failed to delete timetable:", err);
+      alert(err.response?.data?.error || "Failed to delete timetable");
+    }
+  }
+
   function getDayLabel(dayId) {
     return [...WEEK_DAYS, ...CYCLE_DAYS].find(d => d.id === dayId)?.label || dayId;
   }
@@ -880,6 +901,13 @@ export default function TimetablePage() {
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", border: "none", borderRadius: 8, background: "#059669", color: "#FFF", cursor: saving ? "not-allowed" : "pointer", fontSize: 13, fontWeight: 600, fontFamily: "var(--font-body)", opacity: saving ? 0.7 : 1 }}>
                 {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <CheckCircle2 size={14} />}
                 {saving ? "Activating..." : "Activate"}
+              </button>
+            )}
+
+            {isAdmin && timetableDetail?.status !== "active" && (
+              <button onClick={handleDeleteTimetable}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "9px 16px", border: "1.5px solid #FECACA", borderRadius: 8, background: "#FFF", cursor: "pointer", fontSize: 13, fontWeight: 600, fontFamily: "var(--font-body)", color: "#DC2626" }}>
+                <Trash2 size={14} /> Delete
               </button>
             )}
           </div>

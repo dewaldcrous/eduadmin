@@ -11,6 +11,8 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser
 
+from django.core.exceptions import ObjectDoesNotExist
+
 from .models import LessonPlan, LessonDelivery, PlanApprovalLog, LessonPlanAttachment
 from .serializers import (
     LessonPlanListSerializer, LessonPlanDetailSerializer,
@@ -86,7 +88,7 @@ class WeeklyPlanView(APIView):
 
         timetable = Timetable.objects.filter(
             school=user.school, status="active"
-        ).first()
+        ).order_by("-year", "-term").first()
 
         if not timetable:
             return Response({"error": "No active timetable found"}, status=404)
@@ -97,7 +99,7 @@ class WeeklyPlanView(APIView):
             cycle_type = config.cycle_type
             num_days = config.num_days
             periods_per_day = config.periods_per_day
-        except TimetableConfig.DoesNotExist:
+        except ObjectDoesNotExist:
             # Default to weekly schedule
             cycle_type = "week"
             num_days = 5
