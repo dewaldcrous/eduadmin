@@ -1,58 +1,88 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import {
   BookCopy, ClipboardCheck, Users, AlertTriangle, CheckCircle2,
   XCircle, Clock, ChevronRight, FileText, TrendingUp, TrendingDown,
-  Eye, Filter, BarChart3,
+  Eye, Filter, BarChart3, Loader2,
 } from "lucide-react";
+import { getPendingApprovals, approvePlan } from "../api/client";
 
-const TEACHERS = [
-  {
-    id: 1, name: "Sarah Williams", username: "t.williams",
-    classes: ["10A", "10B", "11A"],
-    plansSubmitted: 12, plansApproved: 10, plansPending: 2, plansOverdue: 0,
-    avgAttendance: 94, avgMarks: 62, lessonsDelivered: 18, lessonsTotal: 20,
-  },
-  {
-    id: 2, name: "Kagiso Modise", username: "t.modise",
-    classes: ["10C", "11B", "12A"],
-    plansSubmitted: 8, plansApproved: 6, plansPending: 1, plansOverdue: 1,
-    avgAttendance: 91, avgMarks: 58, lessonsDelivered: 15, lessonsTotal: 20,
-  },
-];
-
-const PENDING_PLANS = [
-  { id: 1, teacher: "Sarah Williams", class: "10A", title: "Trigonometry Basics", submitted: "2 hours ago", period: "P1" },
-  { id: 2, teacher: "Sarah Williams", class: "11A", title: "Quadratic Equations", submitted: "Yesterday", period: "P4" },
-  { id: 3, teacher: "Kagiso Modise", class: "10C", title: "Exponents Review", submitted: "3 days ago", period: "P3" },
-];
-
-const CLASS_PERFORMANCE = [
-  { class: "10A", teacher: "S. Williams", attendance: 96, avgMark: 64, behaviour: 3.8, atRisk: 2, plansComplete: true },
-  { class: "10B", teacher: "S. Williams", attendance: 93, avgMark: 61, behaviour: 3.5, atRisk: 3, plansComplete: true },
-  { class: "10C", teacher: "K. Modise", attendance: 89, avgMark: 55, behaviour: 3.1, atRisk: 5, plansComplete: false },
-  { class: "11A", teacher: "S. Williams", attendance: 95, avgMark: 58, behaviour: 3.6, atRisk: 1, plansComplete: true },
-  { class: "11B", teacher: "K. Modise", attendance: 92, avgMark: 52, behaviour: 3.3, atRisk: 4, plansComplete: false },
-  { class: "12A", teacher: "K. Modise", attendance: 97, avgMark: 67, behaviour: 4.1, atRisk: 1, plansComplete: true },
-];
-
-const OUTSTANDING = [
-  { type: "plan", teacher: "Kagiso Modise", detail: "Lesson plan overdue for 10C (P3) — 3 days", severity: "high" },
-  { type: "marks", teacher: "Kagiso Modise", detail: "Assignment 1 marks not captured for 11B", severity: "medium" },
-  { type: "reflection", teacher: "Sarah Williams", detail: "2 reflections pending for this week", severity: "low" },
-  { type: "attendance", teacher: "Kagiso Modise", detail: "10C attendance not taken for 2 days this week", severity: "high" },
-];
+// Helper to format relative time
+function timeAgo(dateStr) {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const diff = Math.floor((now - date) / 1000);
+  if (diff < 60) return "Just now";
+  if (diff < 3600) return `${Math.floor(diff / 60)} min ago`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)} hours ago`;
+  if (diff < 604800) return `${Math.floor(diff / 86400)} days ago`;
+  return date.toLocaleDateString();
+}
 
 export default function HODDashboardPage() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState("overview");
+  const [activeTab, setActiveTab] = useState("approvals");
+  const [pendingPlans, setPendingPlans] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState(null);
 
-  const totalPlans = TEACHERS.reduce((sum, t) => sum + t.plansSubmitted, 0);
-  const pendingCount = PENDING_PLANS.length;
-  const overdueCount = TEACHERS.reduce((sum, t) => sum + t.plansOverdue, 0);
-  const avgAttendance = Math.round(CLASS_PERFORMANCE.reduce((sum, c) => sum + c.attendance, 0) / CLASS_PERFORMANCE.length);
+  // Fetch pending approvals on mount
+  useEffect(() => {
+    loadPendingPlans();
+  }, []);
+
+  async function loadPendingPlans() {
+    setLoading(true);
+    try {
+      const res = await getPendingApprovals();
+      // Handle paginated response (res.data.results) or direct array (res.data)
+      const data = res.data?.results || res.data || [];
+      setPendingPlans(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error("Failed to load pending plans:", err);
+      setPendingPlans([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleApprove(planId) {
+    setActionLoading(planId);
+    try {
+      await approvePlan(planId, "approved");
+      setPendingPlans(pendingPlans.filter(p => p.id !== planId));
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to approve plan");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleReturn(planId) {
+    const feedback = prompt("Enter feedback for the teacher (optional):");
+    if (feedback === null) return; // User cancelled
+    setActionLoading(planId);
+    try {
+      await approvePlan(planId, "returned", feedback);
+      setPendingPlans(pendingPlans.filter(p => p.id !== planId));
+    } catch (err) {
+      alert(err.response?.data?.error || "Failed to return plan");
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  // Stats from real data
+  const pendingCount = pendingPlans.length;
+
+  // Placeholder stats (these would come from additional API endpoints)
+  const TEACHERS = [];
+  const CLASS_PERFORMANCE = [];
+  const OUTSTANDING = [];
+  const overdueCount = 0;
+  const avgAttendance = 0;
 
   return (
     <div style={styles.page}>
@@ -168,27 +198,49 @@ export default function HODDashboardPage() {
         {/* ─── PLAN APPROVALS ─────────────────────────────────────────── */}
         {activeTab === "approvals" && (
           <div style={styles.approvalList}>
-            {PENDING_PLANS.length === 0 ? (
+            {loading ? (
+              <div style={styles.emptyState}>
+                <Loader2 size={40} color="var(--color-accent)" style={{ animation: "spin 1s linear infinite" }} />
+                <p>Loading pending plans...</p>
+              </div>
+            ) : pendingPlans.length === 0 ? (
               <div style={styles.emptyState}>
                 <CheckCircle2 size={40} color="var(--color-success)" />
                 <p>All plans are approved. Nothing pending.</p>
               </div>
             ) : (
-              PENDING_PLANS.map((plan) => (
+              pendingPlans.map((plan) => (
                 <div key={plan.id} style={styles.approvalCard}>
                   <div style={styles.approvalLeft}>
                     <div style={styles.approvalIcon}><FileText size={18} color="var(--color-accent)" /></div>
                     <div>
                       <div style={styles.approvalTitle}>{plan.title}</div>
                       <div style={styles.approvalMeta}>
-                        {plan.teacher} · {plan.class} · {plan.period} · Submitted {plan.submitted}
+                        {plan.teacher_name || "Unknown"} · {plan.classroom_name || ""} · P{plan.slot_period || "?"} · Submitted {timeAgo(plan.created_at)}
                       </div>
                     </div>
                   </div>
                   <div style={styles.approvalActions}>
-                    <button style={styles.approveBtn}><CheckCircle2 size={14} /> Approve</button>
-                    <button style={styles.returnBtn}><XCircle size={14} /> Return</button>
-                    <button style={styles.viewBtn}><Eye size={14} /> View</button>
+                    <button
+                      style={styles.approveBtn}
+                      onClick={() => handleApprove(plan.id)}
+                      disabled={actionLoading === plan.id}
+                    >
+                      {actionLoading === plan.id ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <CheckCircle2 size={14} />} Approve
+                    </button>
+                    <button
+                      style={styles.returnBtn}
+                      onClick={() => handleReturn(plan.id)}
+                      disabled={actionLoading === plan.id}
+                    >
+                      <XCircle size={14} /> Return
+                    </button>
+                    <button
+                      style={styles.viewBtn}
+                      onClick={() => navigate("/planning")}
+                    >
+                      <Eye size={14} /> View
+                    </button>
                   </div>
                 </div>
               ))

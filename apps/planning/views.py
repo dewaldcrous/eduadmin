@@ -237,12 +237,43 @@ class SubmitPlanView(APIView):
         serializer = SubmitPlanSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         try:
-            plan = LessonPlan.objects.get(id=serializer.validated_data["plan_id"])
+            plan = LessonPlan.objects.select_related(
+                "timetable_slot__subject"
+            ).get(id=serializer.validated_data["plan_id"])
         except LessonPlan.DoesNotExist:
             return Response({"error": "Plan not found"}, status=404)
 
         if plan.status not in ["draft", "rejected"]:
             return Response({"error": f"Cannot submit plan with status '{plan.status}'"}, status=400)
+
+        user = request.user
+        subject = plan.timetable_slot.subject
+
+        # Auto-approve if user is HOD/management for their own subject
+        should_auto_approve = False
+        if user.role in ["hod", "deputy", "principal", "admin"]:
+            # HOD: auto-approve if they are the HOD for this subject
+            if user.role == "hod" and subject.hod_id == user.id:
+                should_auto_approve = True
+            # Management (deputy/principal/admin): always auto-approve their own plans
+            elif user.role in ["deputy", "principal", "admin"]:
+                should_auto_approve = True
+
+        if should_auto_approve:
+            plan.approve(user)
+            PlanApprovalLog.objects.create(
+                lesson_plan=plan, action="submitted", actioned_by=user
+            )
+            PlanApprovalLog.objects.create(
+                lesson_plan=plan, action="approved", actioned_by=user,
+                feedback="Auto-approved (submitted by HOD/Management)"
+            )
+            return Response({
+                "status": "approved",
+                "plan_id": plan.id,
+                "auto_approved": True,
+                "message": "Plan auto-approved as you are HOD/Management for this subject"
+            })
 
         plan.submit_for_approval()
         PlanApprovalLog.objects.create(lesson_plan=plan, action="submitted", actioned_by=request.user)
