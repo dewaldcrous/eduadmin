@@ -365,8 +365,10 @@ class MyTimetableSlotsView(APIView):
                 "start_time": slot.start_time.strftime("%H:%M"),
                 "end_time": slot.end_time.strftime("%H:%M"),
                 "subject": slot.subject.name,
+                "subject_name": slot.subject.name,
                 "subject_code": slot.subject.code,
                 "classroom": str(slot.classroom),
+                "classroom_name": str(slot.classroom),
                 "classroom_id": slot.classroom.id,
                 "grade": slot.classroom.grade.name,
                 "teacher": slot.teacher.get_full_name() if slot.teacher else None,
@@ -382,6 +384,29 @@ class MyTimetableSlotsView(APIView):
             "slot_count": len(data),
             "slots": data,
         })
+
+
+class MyHomeroomView(APIView):
+    """Return classrooms where current user is the homeroom teacher."""
+    permission_classes = [IsTeacherOrAbove]
+
+    def get(self, request):
+        user = request.user
+        classrooms = Classroom.objects.filter(
+            school=user.school, homeroom_teacher=user
+        ).select_related("grade")
+
+        data = []
+        for cls in classrooms:
+            data.append({
+                "id": cls.id,
+                "name": str(cls),
+                "grade_name": cls.grade.name if cls.grade else None,
+                "room": cls.room,
+                "learner_count": cls.enrollments.filter(year=2026).count(),
+            })
+
+        return Response(data)
 
 
 class ClassroomListView(APIView):

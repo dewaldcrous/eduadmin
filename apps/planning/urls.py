@@ -2,7 +2,7 @@ from django.urls import path
 from .views import (
     LessonPlanListCreateView, LessonPlanDetailView,
     WeeklyPlanView, SubmitPlanView, ApprovePlanView,
-    DeliverLessonView, PendingApprovalsView,
+    DeliverLessonView, ReflectLessonView, PendingApprovalsView,
     AttachmentUploadView, AttachmentListView, AttachmentDeleteView,
     ImportPlansFromExcelView, ExportPlansView,
 )
@@ -19,6 +19,7 @@ urlpatterns = [
     path("submit/", SubmitPlanView.as_view(), name="plan-submit"),
     path("approve/", ApprovePlanView.as_view(), name="plan-approve"),
     path("deliver/", DeliverLessonView.as_view(), name="plan-deliver"),
+    path("reflect/", ReflectLessonView.as_view(), name="plan-reflect"),
     path("pending/", PendingApprovalsView.as_view(), name="plan-pending"),
 
     # Attachments

@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import {
   getWeeklyPlan, createPlan, updatePlan, deletePlan,
-  submitPlan, deliverLesson, importPlans, exportPlansUrl,
+  submitPlan, deliverLesson, reflectLesson, importPlans, exportPlansUrl,
   uploadAttachments, getAttachments, deleteAttachment,
 } from "../api/client";
 import {
   BookCopy, Plus, Check, Clock, X, Send, Edit3, AlertCircle,
   CheckCircle2, FileText, Save, Loader2, Upload, Download,
   Paperclip, File, ChevronLeft, ChevronRight, Calendar, Trash2,
+  MessageSquare, ArrowRight,
 } from "lucide-react";
 
 // ─── CONSTANTS ────────────────────────────────────────────────────────────────
@@ -111,6 +112,19 @@ export default function WeeklyPlannerPage() {
   const [pnd, setPnd] = useState([]); // pending new file attachments
   const [existingAtts, setExistingAtts] = useState([]); // existing attachments for the selected plan
   const [loadingAtts, setLoadingAtts] = useState(false);
+
+  // Reflection state
+  const [showReflect, setShowReflect] = useState(false);
+  const [reflectPlan, setReflectPlan] = useState(null);
+  const [reflectForm, setReflectForm] = useState({
+    what_went_well: "",
+    challenges: "",
+    learner_engagement: "good",
+    content_covered: 100,
+    carry_over_needed: false,
+    carry_over_notes: "",
+    adjustments_for_next_time: "",
+  });
 
   // ── Computed ──
   // Use dynamic days/periods from config, fallback to defaults
@@ -276,6 +290,52 @@ export default function WeeklyPlannerPage() {
     } catch (err) {
       console.error("Failed to mark as delivered:", err);
       alert(err.response?.data?.error || "Failed to mark as delivered");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // ── Open reflection modal ──
+  function openReflection(plan) {
+    setReflectPlan(plan);
+    // Pre-fill form if reflection exists
+    if (plan.reflection) {
+      setReflectForm({
+        what_went_well: plan.reflection.what_went_well || "",
+        challenges: plan.reflection.challenges || "",
+        learner_engagement: plan.reflection.learner_engagement || "good",
+        content_covered: plan.reflection.content_covered || 100,
+        carry_over_needed: plan.reflection.carry_over_needed || false,
+        carry_over_notes: plan.reflection.carry_over_notes || "",
+        adjustments_for_next_time: plan.reflection.adjustments_for_next_time || "",
+      });
+    } else {
+      setReflectForm({
+        what_went_well: "",
+        challenges: "",
+        learner_engagement: "good",
+        content_covered: 100,
+        carry_over_needed: false,
+        carry_over_notes: "",
+        adjustments_for_next_time: "",
+      });
+    }
+    setShowReflect(true);
+    setSp(null);
+  }
+
+  // ── Save reflection ──
+  async function handleSaveReflection() {
+    if (!reflectPlan) return;
+    setSaving(true);
+    try {
+      await reflectLesson(reflectPlan.id, reflectForm);
+      await loadWeeklyData();
+      setShowReflect(false);
+      setReflectPlan(null);
+    } catch (err) {
+      console.error("Failed to save reflection:", err);
+      alert(err.response?.data?.error || "Failed to save reflection");
     } finally {
       setSaving(false);
     }
@@ -643,6 +703,12 @@ export default function WeeklyPlannerPage() {
                   {saving ? <Loader2 size={14} style={{ animation: "spin 1s linear infinite" }} /> : <Check size={14} />} Mark Delivered
                 </button>
               )}
+              {sp.has_delivery && (
+                <button onClick={() => openReflection(sp)}
+                  style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-body)", background: sp.reflection ? "#EDE9FE" : "#FEF3C7", color: sp.reflection ? "#7C3AED" : "#D97706", border: "none", borderRadius: 6, cursor: "pointer" }}>
+                  <MessageSquare size={14} /> {sp.reflection ? "Edit Reflection" : "Add Reflection"}
+                </button>
+              )}
               <button onClick={() => handleDeletePlan(sp.id)}
                 style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-body)", background: "#FEE2E2", color: "#DC2626", border: "none", borderRadius: 6, cursor: "pointer", marginLeft: "auto" }}>
                 <Trash2 size={14} /> Delete
@@ -830,6 +896,106 @@ export default function WeeklyPlannerPage() {
                   ))}
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════
+          REFLECTION MODAL
+      ═══════════════════════════════════════════════════════════ */}
+      {showReflect && reflectPlan && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.4)", zIndex: 200, display: "flex", justifyContent: "center", alignItems: "center", animation: "fadeIn 0.2s" }}
+          onClick={() => setShowReflect(false)}>
+          <div style={{ width: 640, maxHeight: "92vh", background: "#FFF", borderRadius: 16, overflow: "hidden", display: "flex", flexDirection: "column" }}
+            onClick={(e) => e.stopPropagation()}>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", padding: 24, borderBottom: "1px solid var(--color-border-light)", background: "#F5F3FF" }}>
+              <div>
+                <div style={{ fontSize: 13, color: "#7C3AED", fontWeight: 600, marginBottom: 4 }}>Lesson Reflection</div>
+                <h2 style={{ fontFamily: "var(--font-display)", fontSize: 20, fontWeight: 600 }}>{reflectPlan.title}</h2>
+              </div>
+              <button onClick={() => setShowReflect(false)} style={{ background: "none", border: "none", color: "var(--color-slate-light)", cursor: "pointer" }}><X size={20} /></button>
+            </div>
+
+            <div style={{ padding: 24, overflowY: "auto", flex: 1, display: "flex", flexDirection: "column", gap: 16 }}>
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-slate)", display: "block", marginBottom: 4 }}>What went well?</label>
+                <textarea rows={2} value={reflectForm.what_went_well}
+                  onChange={(e) => setReflectForm({ ...reflectForm, what_went_well: e.target.value })}
+                  placeholder="What aspects of the lesson were successful?"
+                  style={{ width: "100%", padding: "10px 14px", fontSize: 14, fontFamily: "var(--font-body)", border: "1.5px solid var(--color-border)", borderRadius: 6, color: "var(--color-navy)", resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-slate)", display: "block", marginBottom: 4 }}>Challenges encountered</label>
+                <textarea rows={2} value={reflectForm.challenges}
+                  onChange={(e) => setReflectForm({ ...reflectForm, challenges: e.target.value })}
+                  placeholder="What difficulties or challenges were faced?"
+                  style={{ width: "100%", padding: "10px 14px", fontSize: 14, fontFamily: "var(--font-body)", border: "1.5px solid var(--color-border)", borderRadius: 6, color: "var(--color-navy)", resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-slate)", display: "block", marginBottom: 4 }}>Learner Engagement</label>
+                  <select value={reflectForm.learner_engagement}
+                    onChange={(e) => setReflectForm({ ...reflectForm, learner_engagement: e.target.value })}
+                    style={{ width: "100%", padding: "10px 14px", fontSize: 14, fontFamily: "var(--font-body)", border: "1.5px solid var(--color-border)", borderRadius: 6, color: "var(--color-navy)", cursor: "pointer" }}>
+                    <option value="excellent">Excellent</option>
+                    <option value="good">Good</option>
+                    <option value="average">Average</option>
+                    <option value="poor">Poor</option>
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-slate)", display: "block", marginBottom: 4 }}>Content Covered (%)</label>
+                  <input type="number" min={0} max={100} value={reflectForm.content_covered}
+                    onChange={(e) => setReflectForm({ ...reflectForm, content_covered: parseInt(e.target.value) || 0 })}
+                    style={{ width: "100%", padding: "10px 14px", fontSize: 14, fontFamily: "var(--font-body)", border: "1.5px solid var(--color-border)", borderRadius: 6, color: "var(--color-navy)", boxSizing: "border-box" }} />
+                </div>
+              </div>
+
+              <div style={{ padding: 16, background: reflectForm.carry_over_needed ? "#FEF3C7" : "#F8FAFC", borderRadius: 10, border: "1px solid " + (reflectForm.carry_over_needed ? "#D97706" : "var(--color-border-light)") }}>
+                <label style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }}>
+                  <input type="checkbox" checked={reflectForm.carry_over_needed}
+                    onChange={(e) => setReflectForm({ ...reflectForm, carry_over_needed: e.target.checked })}
+                    style={{ width: 18, height: 18, cursor: "pointer" }} />
+                  <div>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: reflectForm.carry_over_needed ? "#D97706" : "var(--color-slate)" }}>
+                      <ArrowRight size={14} style={{ verticalAlign: "middle", marginRight: 4 }} />
+                      Carry over to next lesson
+                    </span>
+                    <div style={{ fontSize: 12, color: "var(--color-slate-light)", marginTop: 2 }}>Check if uncovered content should be continued in the next lesson</div>
+                  </div>
+                </label>
+
+                {reflectForm.carry_over_needed && (
+                  <textarea rows={2} value={reflectForm.carry_over_notes}
+                    onChange={(e) => setReflectForm({ ...reflectForm, carry_over_notes: e.target.value })}
+                    placeholder="What content needs to be carried over?"
+                    style={{ width: "100%", padding: "10px 14px", fontSize: 14, fontFamily: "var(--font-body)", border: "1.5px solid #D97706", borderRadius: 6, color: "var(--color-navy)", resize: "vertical", boxSizing: "border-box", marginTop: 12, background: "#FFF" }} />
+                )}
+              </div>
+
+              <div>
+                <label style={{ fontSize: 13, fontWeight: 600, color: "var(--color-slate)", display: "block", marginBottom: 4 }}>Adjustments for next time</label>
+                <textarea rows={2} value={reflectForm.adjustments_for_next_time}
+                  onChange={(e) => setReflectForm({ ...reflectForm, adjustments_for_next_time: e.target.value })}
+                  placeholder="What would you do differently?"
+                  style={{ width: "100%", padding: "10px 14px", fontSize: 14, fontFamily: "var(--font-body)", border: "1.5px solid var(--color-border)", borderRadius: 6, color: "var(--color-navy)", resize: "vertical", boxSizing: "border-box" }} />
+              </div>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "16px 24px", borderTop: "1px solid var(--color-border-light)", background: "var(--color-surface-alt)" }}>
+              <button onClick={() => setShowReflect(false)}
+                style={{ padding: "10px 18px", fontSize: 14, fontWeight: 500, fontFamily: "var(--font-body)", background: "transparent", color: "var(--color-slate)", border: "1px solid var(--color-border)", borderRadius: 6, cursor: "pointer" }}>
+                Cancel
+              </button>
+              <button onClick={handleSaveReflection} disabled={saving}
+                style={{ display: "flex", alignItems: "center", gap: 6, padding: "10px 18px", fontSize: 14, fontWeight: 600, fontFamily: "var(--font-body)", background: "#7C3AED", color: "#FFF", border: "none", borderRadius: 6, cursor: "pointer", opacity: saving ? 0.7 : 1 }}>
+                {saving ? <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} /> : <Save size={16} />}
+                Save Reflection
+              </button>
             </div>
           </div>
         </div>

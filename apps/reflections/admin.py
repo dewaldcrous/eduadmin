@@ -1,4 +1,4 @@
 from django.contrib import admin
-from .models import LessonReflection, ToDoTask, CarryOverPackage
+from .models import ToDoTask, CarryOverPackage
 
-admin.site.register([LessonReflection, ToDoTask, CarryOverPackage])
+admin.site.register([ToDoTask, CarryOverPackage])

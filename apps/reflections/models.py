@@ -2,39 +2,6 @@ from django.db import models
 from django.conf import settings
 
 
-class LessonReflection(models.Model):
-    WEEK_RATINGS = [
-        ("difficult", "Difficult"),
-        ("mixed", "Mixed"),
-        ("good", "Good"),
-        ("excellent", "Excellent"),
-    ]
-
-    lesson_plan = models.OneToOneField(
-        "planning.LessonPlan",
-        on_delete=models.CASCADE,
-        related_name="reflection",
-    )
-    what_went_well = models.TextField(blank=True)
-    what_was_challenging = models.TextField(blank=True)
-    needs_revisiting = models.TextField(blank=True)
-    do_differently = models.TextField(blank=True)
-    engagement_rating = models.PositiveIntegerField(default=5)  # 1-10
-    flagged_learners = models.ManyToManyField(
-        settings.AUTH_USER_MODEL, blank=True, related_name="flagged_in_reflections"
-    )
-    created_by = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
-        null=True,
-        related_name="reflections_created",
-    )
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    def __str__(self):
-        return f"Reflection: {self.lesson_plan.title}"
-
-
 class ToDoTask(models.Model):
     TYPES = [
         ("content", "Content"),
@@ -55,7 +22,7 @@ class ToDoTask(models.Model):
     ]
 
     reflection = models.ForeignKey(
-        LessonReflection, on_delete=models.CASCADE, related_name="todos"
+        "planning.LessonReflection", on_delete=models.CASCADE, related_name="todos"
     )
     description = models.TextField()
     task_type = models.CharField(max_length=20, choices=TYPES)

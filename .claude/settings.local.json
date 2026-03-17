@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python manage.py makemigrations:*)",
+      "Bash(source:*)",
+      "Bash(python manage.py migrate:*)"
+    ]
+  }
+}

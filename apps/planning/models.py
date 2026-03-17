@@ -156,6 +156,50 @@ class LessonDelivery(models.Model):
         return f"{self.lesson_plan.title} - {self.completion}"
 
 
+class LessonReflection(models.Model):
+    """Teacher's reflection on lesson delivery - what worked, what didn't, carry-over needs."""
+
+    lesson_plan = models.OneToOneField(
+        LessonPlan, on_delete=models.CASCADE, related_name="reflection"
+    )
+    what_went_well = models.TextField(blank=True, help_text="What aspects of the lesson were successful?")
+    challenges = models.TextField(blank=True, help_text="What challenges or difficulties were encountered?")
+    learner_engagement = models.CharField(
+        max_length=20,
+        choices=[
+            ("excellent", "Excellent"),
+            ("good", "Good"),
+            ("average", "Average"),
+            ("poor", "Poor"),
+        ],
+        default="good",
+    )
+    content_covered = models.PositiveIntegerField(
+        default=100, help_text="Percentage of planned content covered (0-100)"
+    )
+    carry_over_needed = models.BooleanField(
+        default=False, help_text="Should uncovered content be carried over to the next lesson?"
+    )
+    carry_over_notes = models.TextField(
+        blank=True, help_text="What content needs to be carried over and why?"
+    )
+    adjustments_for_next_time = models.TextField(
+        blank=True, help_text="What would you do differently next time?"
+    )
+    reflected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True,
+        related_name="lesson_reflections",
+    )
+    reflected_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"Reflection: {self.lesson_plan.title}"
+
+    class Meta:
+        ordering = ["-reflected_at"]
+
+
 class PlanApprovalLog(models.Model):
     ACTIONS = [
         ("submitted", "Submitted"),

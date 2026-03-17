@@ -127,6 +127,7 @@ class WeeklyPlanView(APIView):
         ).select_related(
             "timetable_slot", "timetable_slot__subject",
             "timetable_slot__classroom", "timetable_slot__classroom__grade",
+            "reflection",
         ).prefetch_related("attachments")
 
         plan_map = {}
@@ -170,7 +171,7 @@ class WeeklyPlanView(APIView):
                     "plan": None,
                 }
                 if plan:
-                    period_data["plan"] = {
+                    plan_data = {
                         "id": plan.id,
                         "title": plan.title,
                         "status": plan.status,
@@ -183,7 +184,20 @@ class WeeklyPlanView(APIView):
                         "has_delivery": hasattr(plan, "delivery"),
                         "has_reflection": hasattr(plan, "reflection"),
                         "attachment_count": plan.attachments.count(),
+                        "reflection": None,
                     }
+                    # Include reflection data if exists
+                    if hasattr(plan, "reflection"):
+                        plan_data["reflection"] = {
+                            "what_went_well": plan.reflection.what_went_well,
+                            "challenges": plan.reflection.challenges,
+                            "learner_engagement": plan.reflection.learner_engagement,
+                            "content_covered": plan.reflection.content_covered,
+                            "carry_over_needed": plan.reflection.carry_over_needed,
+                            "carry_over_notes": plan.reflection.carry_over_notes,
+                            "adjustments_for_next_time": plan.reflection.adjustments_for_next_time,
+                        }
+                    period_data["plan"] = plan_data
                 day_data["periods"].append(period_data)
             weekly.append(day_data)
 
@@ -293,6 +307,44 @@ class DeliverLessonView(APIView):
         return Response({
             "status": "delivered", "plan_id": plan.id,
             "completion": delivery.completion,
+        })
+
+
+class ReflectLessonView(APIView):
+    """Add or update a reflection on a delivered lesson."""
+    permission_classes = [IsTeacherOrAbove]
+
+    def post(self, request):
+        from .serializers import ReflectLessonSerializer
+        from .models import LessonReflection
+
+        serializer = ReflectLessonSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            plan = LessonPlan.objects.get(id=serializer.validated_data["plan_id"])
+        except LessonPlan.DoesNotExist:
+            return Response({"error": "Plan not found"}, status=404)
+
+        reflection, created = LessonReflection.objects.update_or_create(
+            lesson_plan=plan,
+            defaults={
+                "what_went_well": serializer.validated_data.get("what_went_well", ""),
+                "challenges": serializer.validated_data.get("challenges", ""),
+                "learner_engagement": serializer.validated_data.get("learner_engagement", "good"),
+                "content_covered": serializer.validated_data.get("content_covered", 100),
+                "carry_over_needed": serializer.validated_data.get("carry_over_needed", False),
+                "carry_over_notes": serializer.validated_data.get("carry_over_notes", ""),
+                "adjustments_for_next_time": serializer.validated_data.get("adjustments_for_next_time", ""),
+                "reflected_by": request.user,
+            },
+        )
+
+        return Response({
+            "status": "reflected",
+            "plan_id": plan.id,
+            "reflection_id": reflection.id,
+            "carry_over_needed": reflection.carry_over_needed,
         })
 
 

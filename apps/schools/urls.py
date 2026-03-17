@@ -1,13 +1,14 @@
 from django.urls import path
 from .views import (
-    MyTimetableSlotsView, ClassroomListView, GradeListView, SubjectListView,
+    MyTimetableSlotsView, MyHomeroomView, ClassroomListView, GradeListView, SubjectListView,
     TimetableListView, TimetableDetailView, TimetableSlotView, TeacherListView,
     SubjectDetailView, GradeDetailView, ClassroomManageView, TimetableConfigView,
 )
 
 urlpatterns = [
-    # Teacher's own slots
+    # Teacher's own slots and homeroom
     path("my-slots/", MyTimetableSlotsView.as_view(), name="my-slots"),
+    path("my-homeroom/", MyHomeroomView.as_view(), name="my-homeroom"),
 
     # Reference data
     path("classrooms/", ClassroomListView.as_view(), name="classroom-list"),

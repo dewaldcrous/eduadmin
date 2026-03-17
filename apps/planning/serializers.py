@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import LessonPlan, LessonDelivery, PlanApprovalLog, CurriculumOutcome, LessonPlanAttachment
+from .models import LessonPlan, LessonDelivery, LessonReflection, PlanApprovalLog, CurriculumOutcome, LessonPlanAttachment
 
 
 class CurriculumOutcomeSerializer(serializers.ModelSerializer):
@@ -70,11 +70,12 @@ class LessonPlanDetailSerializer(serializers.ModelSerializer):
     slot_period = serializers.IntegerField(source="timetable_slot.period", read_only=True)
     approval_logs = PlanApprovalLogSerializer(many=True, read_only=True)
     delivery = LessonDeliverySerializer(read_only=True)
+    reflection = serializers.SerializerMethodField()
     attachments = LessonPlanAttachmentSerializer(many=True, read_only=True)
     approved_by_name = serializers.SerializerMethodField()
     class Meta:
         model = LessonPlan
-        fields = ["id", "timetable_slot", "plan_type", "status", "title", "objectives", "activities", "differentiation", "resources_note", "submitted_by", "approved_by", "approved_by_name", "approved_at", "version", "slot_day", "slot_period", "teacher_name", "subject_name", "classroom_name", "approval_logs", "delivery", "attachments", "created_at", "updated_at"]
+        fields = ["id", "timetable_slot", "plan_type", "status", "title", "objectives", "activities", "differentiation", "resources_note", "submitted_by", "approved_by", "approved_by_name", "approved_at", "version", "slot_day", "slot_period", "teacher_name", "subject_name", "classroom_name", "approval_logs", "delivery", "reflection", "attachments", "created_at", "updated_at"]
         read_only_fields = ["submitted_by", "approved_by", "approved_at", "version", "status", "created_at", "updated_at"]
     def get_teacher_name(self, obj):
         return obj.timetable_slot.teacher.get_full_name() if obj.timetable_slot.teacher else None
@@ -84,6 +85,20 @@ class LessonPlanDetailSerializer(serializers.ModelSerializer):
         return str(obj.timetable_slot.classroom)
     def get_approved_by_name(self, obj):
         return obj.approved_by.get_full_name() if obj.approved_by else None
+    def get_reflection(self, obj):
+        if hasattr(obj, "reflection"):
+            return {
+                "id": obj.reflection.id,
+                "what_went_well": obj.reflection.what_went_well,
+                "challenges": obj.reflection.challenges,
+                "learner_engagement": obj.reflection.learner_engagement,
+                "content_covered": obj.reflection.content_covered,
+                "carry_over_needed": obj.reflection.carry_over_needed,
+                "carry_over_notes": obj.reflection.carry_over_notes,
+                "adjustments_for_next_time": obj.reflection.adjustments_for_next_time,
+                "reflected_at": obj.reflection.reflected_at,
+            }
+        return None
     def create(self, validated_data):
         validated_data["submitted_by"] = self.context["request"].user
         validated_data["status"] = "draft"
@@ -102,3 +117,35 @@ class DeliverLessonSerializer(serializers.Serializer):
     plan_id = serializers.IntegerField()
     completion = serializers.ChoiceField(choices=["full", "partial", "not_done"])
     coverage_percent = serializers.IntegerField(min_value=0, max_value=100, default=100)
+
+
+class LessonReflectionSerializer(serializers.ModelSerializer):
+    reflected_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = LessonReflection
+        fields = [
+            "id", "lesson_plan", "what_went_well", "challenges",
+            "learner_engagement", "content_covered", "carry_over_needed",
+            "carry_over_notes", "adjustments_for_next_time",
+            "reflected_by", "reflected_by_name", "reflected_at", "updated_at",
+        ]
+        read_only_fields = ["reflected_by", "reflected_at", "updated_at"]
+
+    def get_reflected_by_name(self, obj):
+        return obj.reflected_by.get_full_name() if obj.reflected_by else None
+
+
+class ReflectLessonSerializer(serializers.Serializer):
+    """Serializer for creating/updating a lesson reflection."""
+    plan_id = serializers.IntegerField()
+    what_went_well = serializers.CharField(required=False, allow_blank=True, default="")
+    challenges = serializers.CharField(required=False, allow_blank=True, default="")
+    learner_engagement = serializers.ChoiceField(
+        choices=["excellent", "good", "average", "poor"],
+        default="good"
+    )
+    content_covered = serializers.IntegerField(min_value=0, max_value=100, default=100)
+    carry_over_needed = serializers.BooleanField(default=False)
+    carry_over_notes = serializers.CharField(required=False, allow_blank=True, default="")
+    adjustments_for_next_time = serializers.CharField(required=False, allow_blank=True, default="")

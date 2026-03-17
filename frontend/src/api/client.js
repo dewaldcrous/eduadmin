@@ -58,6 +58,7 @@ export var toggleStaffStatus = function(id, isActive) { return client.patch("/ac
 // ─── Schools & Timetable ──────────────────────────────────
 export var getSchools = function() { return client.get("/schools/"); };
 export var getMySlots = function() { return client.get("/schools/my-slots/"); };
+export var getHomeroomClasses = function() { return client.get("/schools/my-homeroom/"); };
 
 // Timetable management
 export var getTimetables = function() { return client.get("/schools/timetables/"); };
@@ -157,6 +158,9 @@ export var approvePlan = function(planId, action, feedback) {
 };
 export var deliverLesson = function(planId, completion, coveragePercent) {
   return client.post("/planning/deliver/", { plan_id: planId, completion: completion, coverage_percent: coveragePercent });
+};
+export var reflectLesson = function(planId, data) {
+  return client.post("/planning/reflect/", { plan_id: planId, ...data });
 };
 export var getPendingApprovals = function() { return client.get("/planning/pending/"); };
 export var importPlans = function(file) {
